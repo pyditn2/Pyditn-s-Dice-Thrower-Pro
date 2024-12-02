@@ -66,6 +66,12 @@ const createNumberTexture = (number) => {
   // Make background transparent
   ctx.clearRect(0, 0, size, size)
   
+  // Add a subtle background circle for better visibility
+  ctx.beginPath()
+  ctx.arc(size/2, size/2, size/3, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
+  ctx.fill()
+  
   // Draw the number
   ctx.fillStyle = 'white'
   ctx.font = 'bold 90px Arial'
@@ -74,9 +80,43 @@ const createNumberTexture = (number) => {
   ctx.fillText(number.toString(), size/2, size/2)
   
   const texture = new THREE.CanvasTexture(canvas)
+  texture.center.set(0.5, 0.5)
   texture.needsUpdate = true
   return texture
 }
+
+// Helper function to create properly oriented label
+const createFaceLabel = (number, center, normal) => {
+  const label = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.5, 0.5),
+    new THREE.MeshPhongMaterial({
+      map: createNumberTexture(number),
+      transparent: true,
+      side: THREE.DoubleSide,
+      shininess: 30,
+      emissive: new THREE.Color(0x333333),
+      emissiveIntensity: 0.2
+    })
+  )
+  
+  // Position slightly above face
+  label.position.copy(center.clone().multiplyScalar(1.01))
+  
+  // Create a consistent up vector for orientation
+  const up = new THREE.Vector3(0, 1, 0)
+  if (Math.abs(normal.y) > 0.9) {
+    up.set(0, 0, -Math.sign(normal.y))
+  }
+  
+  // Orient the label to face outward and maintain consistent rotation
+  label.lookAt(center.clone().add(normal))
+  label.up.copy(up)
+  label.updateMatrix()
+  
+  return label
+}
+
+
 
 const createD20 = () => {
   // Create base geometry and material for the dice
@@ -90,8 +130,25 @@ const createD20 = () => {
   const startY = 4
   mesh.position.set(0, startY, 0)
   
+  // - Opposite faces sum to 21
+  // - Numbers around each vertex are in sequence
+  const d20Layout = [
+    [20, 8, 14, 2, 16],    // Upper pentagon
+    [10, 12, 4, 6, 18],    // Middle strip
+    [19, 7, 13, 1, 15],    // Middle strip
+    [11, 3, 17, 5, 9]      // Lower pentagon
+  ]
+  
+  // Flatten the layout into a single array
+  const numberArrangement = d20Layout.flat()
+  
+  // Rest of the code remains the same...
   const positions = geometry.attributes.position.array
   diceNumbers = []
+  
+  // Calculate face normals and centers
+  const faceNormals = []
+  const faceCenters = []
   
   for (let i = 0; i < positions.length; i += 9) {
     const v1 = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2])
@@ -108,26 +165,22 @@ const createD20 = () => {
     
     center.add(v1).add(v2).add(v3).divideScalar(3)
     
-    const label = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.5, 0.5),
-      new THREE.MeshPhongMaterial({
-        map: createNumberTexture(diceNumbers.length + 1),
-        transparent: true,
-        side: THREE.DoubleSide,
-        shininess: 30,
-        emissive: new THREE.Color(0x333333), // Slight emission to ensure visibility
-        emissiveIntensity: 0.2
-      })
+    faceNormals.push(normal.clone())
+    faceCenters.push(center.clone())
+  }
+  
+  // Create labels with correct number arrangement using the helper function
+  for (let i = 0; i < 20; i++) {
+    const label = createFaceLabel(
+      numberArrangement[i],
+      faceCenters[i],
+      faceNormals[i]
     )
-    
-    label.position.copy(center.multiplyScalar(1.01))
-    label.lookAt(center.add(normal))
-    
     mesh.add(label)
     
     diceNumbers.push({
-      number: diceNumbers.length + 1,
-      normal: normal
+      number: numberArrangement[i],
+      normal: faceNormals[i]
     })
   }
   
@@ -239,7 +292,7 @@ const animate = () => {
 const calculateCameraOrientation = () => {
   if (!dice || !diceNumbers.length) return null
   
-  // Find which face is up (we keep this part as it works well)
+  // Find which face is up
   const upVector = new THREE.Vector3(0, 1, 0)
   let maxDot = -1
   let upFaceNormal = null
@@ -260,14 +313,12 @@ const calculateCameraOrientation = () => {
   const dicePosition = dice.position
   const cameraHeight = 5
   
-  // Simply position camera directly above the dice
   const cameraPosition = new THREE.Vector3(
     dicePosition.x,
     dicePosition.y + cameraHeight,
     dicePosition.z
   )
   
-  // Always use the world "north" as up direction
   const upDirection = new THREE.Vector3(0, 0, -1)
   
   return {
@@ -303,8 +354,8 @@ const resetCamera = () => {
     endPos: new THREE.Vector3(0, 8, 12),
     startTarget: cameraState.target.clone(),
     endTarget: new THREE.Vector3(0, 0, 0),
-    startUp: camera.up.clone(),         // Add this
-    endUp: new THREE.Vector3(0, 1, 0),  // Add this
+    startUp: camera.up.clone(), 
+    endUp: new THREE.Vector3(0, 1, 0), 
     startTime: Date.now(),
     duration: 1000
   }

@@ -6,6 +6,7 @@ export const useCharacterStore = defineStore('character', {
       name: '',
       spezies: '',
       kultur: '',
+      profession: ''
     },
 
     stats: {
