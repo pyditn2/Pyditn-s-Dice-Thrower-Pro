@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useCharacterStore } from '../stores/characterStore'
 import DiceRoller from './DiceRoller.vue' 
 
@@ -11,7 +11,33 @@ const selectedDice = ref('d20')
 const diceCount = ref(1)
 const modification = ref(0)
 
-const diceRollerRef = ref(null)
+
+
+const throwDelay = 300
+
+// Create refs for multiple dice rollers
+const diceRollers = ref([])
+const setDiceRollerRef = (el, index) => {
+  if (el) {
+    while (diceRollers.value.length <= index) {
+      diceRollers.value.push(null)
+    }
+    diceRollers.value[index] = el
+  }
+}
+
+const visibleDiceRollers = computed(() => {
+  switch (selectedCheckType.value) {
+    case 'attribute':
+      return 1
+    case 'talent':
+      return 3
+    case 'free':
+      return 1
+    default:
+      return 1
+  }
+})
 
 const attributeNames = {
   MU: 'Mut',
@@ -34,27 +60,50 @@ const categoryNames = {
 
 const performCheck = async () => {
   console.log('Check started')
-  if (!diceRollerRef.value) {
-    console.error('No dice roller ref')
-    return
-  }
+  const THROW_DELAY = 100; // 100ms delay between throws
   
   try {
-    let results;
+    let results = [];
     console.log('Selected check type:', selectedCheckType.value)
     
     switch (selectedCheckType.value) {
       case 'attribute':
         console.log('Rolling for attribute check')
-        results = await diceRollerRef.value.rollDice('d20', 1);
+        results = await diceRollers.value[0].rollDice('d20', 1);
         break;
-      case 'talent':
-        console.log('Rolling for talent check')
-        results = await diceRollerRef.value.rollDice('d20', 3);
-        break;
+        
+  case 'talent':
+  console.log('Rolling for talent check')
+  
+  // Start all rolls in quick succession
+  diceRollers.value[0].startRoll()
+  await new Promise(resolve => setTimeout(resolve, THROW_DELAY))
+  
+  diceRollers.value[1].startRoll()
+  await new Promise(resolve => setTimeout(resolve, THROW_DELAY))
+  
+  diceRollers.value[2].startRoll()
+  
+  // Wait for all dice to settle
+  const [result1, result2, result3] = await Promise.all([
+    diceRollers.value[0].waitForSettling(),
+    diceRollers.value[1].waitForSettling(),
+    diceRollers.value[2].waitForSettling()
+  ])
+  
+  // After all dice have settled, wait 4 seconds then reset all cameras
+  setTimeout(() => {
+    diceRollers.value.forEach(roller => {
+      roller.resetCamera()
+    })
+  }, 4000)
+  
+  results = [...result1, ...result2, ...result3]
+  break
+        
       case 'free':
         console.log('Rolling free dice', selectedDice.value, diceCount.value)
-        results = await diceRollerRef.value.rollDice(selectedDice.value, diceCount.value);
+        results = await diceRollers.value[0].rollDice(selectedDice.value, diceCount.value);
         break;
     }
     console.log('Roll results:', results);
@@ -101,9 +150,20 @@ const performCheck = async () => {
         </div>
       </div>
 
-      <div style="color: white;">Debug: DiceRoller should appear below</div>
-      <DiceRoller ref="diceRollerRef" />
-      <div style="color: white;">Debug: DiceRoller should appear above</div>
+      <!-- Dice Roller Container -->
+      <div class="dice-rollers-container">
+    <template v-for="index in visibleDiceRollers" :key="index">
+      <div class="dice-roller-wrapper">
+        <div class="dice-roller-label">
+          {{ selectedCheckType === 'talent' ? `Würfel ${index}` : '' }}
+        </div>
+        <DiceRoller 
+          :ref="(el) => setDiceRollerRef(el, index-1)"
+          class="dice-roller"
+        />
+      </div>
+    </template>
+  </div>
 
       <!-- Check Configuration -->
       <div class="check-config">
@@ -207,6 +267,31 @@ const performCheck = async () => {
   margin-top: 0.5rem;
 }
 
+.dice-rollers-container {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1rem 0;
+  width: 100%;
+}
+
+.dice-roller-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 300px; /* Fixed width for each roller */
+}
+
+.dice-roller-label {
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.dice-roller {
+  width: 100%; /* Take full width of wrapper */
+}
+
 .check-config {
   display: flex;
   flex-direction: column;
@@ -262,5 +347,17 @@ select, input {
 
 .roll-button:hover {
   background: #3aa876;
+}
+
+@media (max-width: 960px) {
+  .dice-rollers-container {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .dice-roller-wrapper {
+    width: 100%;
+    max-width: 300px;
+  }
 }
 </style>
