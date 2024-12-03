@@ -46,6 +46,11 @@
           Talentprobe
         </button>
       </div>
+      <div v-if="checkType === 'talent'" class="camera-controls">
+        <button class="camera-reset-button" @click="resetAllCameras">
+          Kameraposition zurücksetzen
+        </button>
+      </div>
       
       <div class="selection" v-if="checkType === 'attribute'">
         <select v-model="selectedAttribute">
@@ -129,6 +134,12 @@ const selectedTalentData = computed(() => {
 // Helper function to get attribute value
 const getAttributeValue = (attr) => {
   return characterStore.stats.attributes[attr] || 0
+}
+
+const resetAllCameras = () => {
+  if (diceRoller1.value) diceRoller1.value.resetCamera();
+  if (diceRoller2.value) diceRoller2.value.resetCamera();
+  if (diceRoller3.value) diceRoller3.value.resetCamera();
 }
 
 const calculateQS = (remainingPoints) => {
@@ -402,6 +413,27 @@ const formatResult = (res) => {
   font-weight: bold;
   color: #42b983;
   margin: 0.5rem 0;
+}
+
+.camera-controls {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.camera-reset-button {
+  background: #333;
+  color: white;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.camera-reset-button:hover {
+  background: #444;
 }
 
 @media (max-width: 960px) {
