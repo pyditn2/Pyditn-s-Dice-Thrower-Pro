@@ -46,11 +46,6 @@
           Talentprobe
         </button>
       </div>
-      <div v-if="checkType === 'talent'" class="camera-controls">
-        <button class="camera-reset-button" @click="resetAllCameras">
-          Kameraposition zurücksetzen
-        </button>
-      </div>
       
       <div class="selection" v-if="checkType === 'attribute'">
         <select v-model="selectedAttribute">
@@ -76,24 +71,33 @@
         </div>
       </div>
       
-      <button class="roll-button" @click="performCheck">
-        Würfeln
-      </button>
+      <div class="button-group">
+        <button class="roll-button" @click="performCheck">
+          Würfeln
+        </button>
+        <button 
+          v-if="checkType === 'talent'" 
+          class="camera-reset-button" 
+          @click="resetAllCameras"
+        >
+          📷🔃
+        </button>
+      </div>
     </div>
     
     <!-- Result display -->
     <div v-if="result" class="result" :class="{ 
-  success: result.success,
-  critical: result.critical && result.success,
-  fumble: result.critical && !result.success
-}">
-  <div class="success-indicator">
-    {{ result.critical || (result.success ? 'Erfolg!' : 'Misserfolg!') }}
-  </div>
-  <div v-if="result.success" class="result-qs">QS {{ result.qualityLevel }}</div>
-    <div class="result-line">Würfe: {{ result.rolls.join(', ') }}</div>
-    <div class="result-line">Benötigte Punkte: {{ result.pointsNeeded }}</div>
-    <div v-if="result.success" class="result-line">Übrige Punkte: {{ result.remainingPoints }}</div>
+      success: result.success,
+      critical: result.critical && result.success,
+      fumble: result.critical && !result.success
+    }">
+      <div class="success-indicator">
+        {{ result.critical || (result.success ? 'Erfolg!' : 'Misserfolg!') }}
+      </div>
+      <div v-if="result.success" class="result-qs">QS {{ result.qualityLevel }}</div>
+      <div class="result-line">Würfe: {{ result.rolls.join(', ') }}</div>
+      <div class="result-line">Benötigte Punkte: {{ result.pointsNeeded }}</div>
+      <div v-if="result.success" class="result-line">Übrige Punkte: {{ result.remainingPoints }}</div>
     </div>
   </div>
 </template>
@@ -332,7 +336,14 @@ const formatResult = (res) => {
   border-radius: 4px;
 }
 
+.button-group {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
 .roll-button {
+  flex: 2;
   padding: 0.75rem;
   background: #42b983;
   color: white;
@@ -430,6 +441,8 @@ const formatResult = (res) => {
   cursor: pointer;
   font-size: 0.9rem;
   transition: background-color 0.2s;
+  width: auto;
+  min-width: fit-content;
 }
 
 .camera-reset-button:hover {
