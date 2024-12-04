@@ -21,6 +21,12 @@ let rigidBodies = []
 let animationFrameId = null
 let diceNumbers = []
 
+let rotationAngle = 0;
+const ROTATION_SPEED = 0.003;
+let lastSettleTime = null;
+const SETTLE_DISPLAY_DURATION = 5000; // 5 seconds in milliseconds
+const isRotating = ref(true);
+
 watch(showExtraViews, (newValue) => {
   if (newValue) {
     // Small delay to ensure DOM is updated
@@ -185,6 +191,8 @@ const resetCamera = () => {
 
 
 const rollDice = async (type, count) => {
+  isRotating.value = false;
+  lastSettleTime = null;
   settledDice.value.clear();
   showExtraViews.value = count > 1
   // Make sure to properly clean up ALL previous dice
@@ -271,6 +279,15 @@ const rollDice = async (type, count) => {
 const animate = () => {
   animationFrameId = requestAnimationFrame(animate);
   world.step();
+
+  // Update rotation angle
+  rotationAngle += ROTATION_SPEED;
+  
+  // Check if we should return to rotating mode
+  if (lastSettleTime && Date.now() - lastSettleTime > SETTLE_DISPLAY_DURATION) {
+    isRotating.value = true;
+    lastSettleTime = null;
+  }
   
   rigidBodies.forEach((rigidBody, index) => {
     // If die is already settled, skip physics calculations
@@ -279,28 +296,37 @@ const animate = () => {
         const camera = cameras[index];
         const dicePosition = dice[index].position;
         
-        // Smooth transition to overhead view
-        const desiredCameraPosition = new THREE.Vector3(
-          dicePosition.x,
-          dicePosition.y + 5,
-          dicePosition.z
-        );
-        camera.position.lerp(desiredCameraPosition, 0.1);
-        
-        // Get or initialize camera transition
-        if (!cameraTransitions.value.has(index)) {
-          cameraTransitions.value.set(index, {
-            isTransitioning: true,
-            startQuaternion: camera.quaternion.clone()
-          });
+        if (isRotating.value) {
+          // Return to rotating around bowl
+          const radius = 12;
+          const offsetAngle = (2 * Math.PI * index) / cameras.length + rotationAngle;
+          const x = Math.cos(offsetAngle) * radius;
+          const z = Math.sin(offsetAngle) * radius;
+          const y = 8;
+          
+          camera.position.lerp(new THREE.Vector3(x, y, z), 0.02);
+          camera.lookAt(0, 0, 0);
+        } else {
+          // Top-down view of settled die
+          const desiredCameraPosition = new THREE.Vector3(
+            dicePosition.x,
+            dicePosition.y + 5,
+            dicePosition.z
+          );
+          camera.position.lerp(desiredCameraPosition, 0.1);
+          
+          // Handle rotation transition
+          if (!cameraTransitions.value.has(index)) {
+            cameraTransitions.value.set(index, {
+              isTransitioning: true,
+              startQuaternion: camera.quaternion.clone()
+            });
+          }
+          
+          const targetQuaternion = new THREE.Quaternion();
+          targetQuaternion.setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0));
+          camera.quaternion.slerp(targetQuaternion, 0.1);
         }
-        
-        // Create target quaternion for top-down view
-        const targetQuaternion = new THREE.Quaternion();
-        targetQuaternion.setFromEuler(new THREE.Euler(-Math.PI/2, 0, 0));
-        
-        // Smoothly interpolate rotation
-        camera.quaternion.slerp(targetQuaternion, 0.1);
       }
       return;
     }
@@ -310,23 +336,23 @@ const animate = () => {
     dice[index].position.set(position.x, position.y, position.z);
     dice[index].quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
 
-    if (position.y < -5) {  // If die falls below -5 units
-  rigidBody.setTranslation({ 
-    x: -8,  // Reset to starting position
-    y: 8 + Math.random() * 2,
-    z: (index - (dice.length-1)/2) * 2.5 
-  });
-  rigidBody.setLinvel(new RAPIER.Vector3(
-    Math.random() * 12 - 2,
-    8,
-    Math.random() * 6 - 3
-  ));
-  rigidBody.setAngvel(new RAPIER.Vector3(
-    Math.random() * 15 - 7.5,
-    Math.random() * 15 - 7.5,
-    Math.random() * 15 - 7.5
-  ));
-}
+    if (position.y < -5) { 
+      rigidBody.setTranslation({ 
+        x: -8, 
+        y: 8 + Math.random() * 2,
+        z: (index - (dice.length-1)/2) * 2.5 
+      });
+      rigidBody.setLinvel(new RAPIER.Vector3(
+        Math.random() * 12 - 2,
+        8,
+        Math.random() * 6 - 3
+      ));
+      rigidBody.setAngvel(new RAPIER.Vector3(
+        Math.random() * 15 - 7.5,
+        Math.random() * 15 - 7.5,
+        Math.random() * 15 - 7.5
+      ));
+    }
     
     // Check if die has settled
     const velocity = rigidBody.linvel();
@@ -350,6 +376,8 @@ const animate = () => {
       const dicePosition = dice[index].position;
 
       if (isSettled) {
+        isRotating.value = false;
+        lastSettleTime = Date.now();
         // Start transition to overhead view
         const desiredCameraPosition = new THREE.Vector3(
           dicePosition.x,
@@ -388,7 +416,18 @@ const animate = () => {
       }
     }
   });
-  
+  if (dice.length === 0) {
+    cameras.forEach((camera, index) => {
+      const radius = 12;
+      const offsetAngle = (2 * Math.PI * index) / cameras.length + rotationAngle;
+      const x = Math.cos(offsetAngle) * radius;
+      const z = Math.sin(offsetAngle) * radius;
+      const y = 8;
+      
+      camera.position.lerp(new THREE.Vector3(x, y, z), 0.02);
+      camera.lookAt(0, 0, 0);
+    });
+  }
   // Render each view
   renderers.forEach((renderer, index) => {
     if (index === 0 || (showExtraViews.value && index < dice.length)) {
