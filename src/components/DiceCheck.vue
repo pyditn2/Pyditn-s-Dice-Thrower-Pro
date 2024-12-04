@@ -4,31 +4,10 @@
     
     <!-- Dice roller container -->
     <div class="dice-rollers">
-      <!-- Always show first dice -->
-      <div class="dice-wrapper">
-        <DiceRoller ref="diceRoller1" class="dice-roller" />
-        <div v-if="selectedTalent && checkType === 'talent'" class="dice-label">
-          {{ selectedTalentData?.attributes[0] }} ({{ getAttributeValue(selectedTalentData?.attributes[0]) }})
-        </div>
-      </div>
-      
-      <!-- Show additional dice for talent checks -->
-      <template v-if="checkType === 'talent'">
-        <div class="dice-wrapper">
-          <DiceRoller ref="diceRoller2" class="dice-roller" />
-          <div class="dice-label">
-            {{ selectedTalentData?.attributes[1] }} ({{ getAttributeValue(selectedTalentData?.attributes[1]) }})
-          </div>
-        </div>
-        
-        <div class="dice-wrapper">
-          <DiceRoller ref="diceRoller3" class="dice-roller" />
-          <div class="dice-label">
-            {{ selectedTalentData?.attributes[2] }} ({{ getAttributeValue(selectedTalentData?.attributes[2]) }})
-          </div>
-        </div>
-      </template>
-    </div>
+  <div class="dice-views">
+    <DiceRoller ref="diceRoller1" class="dice-roller" />
+  </div>
+</div>
     
     <!-- Controls -->
     <div class="controls">
@@ -109,8 +88,6 @@ import DiceRoller from './DiceRoller.vue'
 
 const characterStore = useCharacterStore()
 const diceRoller1 = ref(null)
-const diceRoller2 = ref(null)
-const diceRoller3 = ref(null)
 const checkType = ref('attribute')
 const selectedAttribute = ref('MU')
 const selectedTalent = ref('')
@@ -142,8 +119,6 @@ const getAttributeValue = (attr) => {
 
 const resetAllCameras = () => {
   if (diceRoller1.value) diceRoller1.value.resetCamera();
-  if (diceRoller2.value) diceRoller2.value.resetCamera();
-  if (diceRoller3.value) diceRoller3.value.resetCamera();
 }
 
 const calculateQS = (remainingPoints) => {
@@ -172,7 +147,6 @@ const performCheck = async () => {
       const roll = await diceRoller1.value.rollDice('d20', 1)
       const attributeValue = characterStore.stats.attributes[selectedAttribute.value]
       
-      // Automatic success on 1, automatic failure on 20
       const success = roll[0] === 1 || (roll[0] <= attributeValue && roll[0] !== 20)
       const remainingPoints = success ? attributeValue - roll[0] : 0
       const qualityLevel = success ? calculateQS(remainingPoints) : 0
@@ -190,41 +164,29 @@ const performCheck = async () => {
     } else {
       const talent = talents.value.find(t => t.name === selectedTalent.value)
       if (!talent) return
-      
-      diceRoller1.value.startRoll()
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      diceRoller2.value.startRoll()
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      diceRoller3.value.startRoll()
-      
-      const [roll1, roll2, roll3] = await Promise.all([
-        diceRoller1.value.waitForSettling(),
-        diceRoller2.value.waitForSettling(),
-        diceRoller3.value.waitForSettling()
-      ])
-      
-      const rolls = [roll1[0], roll2[0], roll3[0]]
-      
-      // Check for critical rolls first
+  
+  // Use single DiceRoller instance for all dice
+      const rolls = await diceRoller1.value.rollDice('d20', 3)
+      console.log('Rolls:', rolls)
+  
+  // Check for critical rolls first
       const criticalResult = checkCriticalRolls(rolls)
-      
-      if (criticalResult) {
-        const pointsNeeded = criticalResult.success ? 0 : talent.value + 1 
-        const remainingPoints = criticalResult.success ? talent.value : -1
-        const qualityLevel = criticalResult.success ? calculateQS(remainingPoints) : 0
-        
-        result.value = {
-          type: 'talent',
-          talent: talent.name,
-          rolls,
-          pointsNeeded,
-          remainingPoints,
-          success: criticalResult.success,
-          qualityLevel,
-          critical: criticalResult.message
-        }
+  
+  if (criticalResult) {
+    const pointsNeeded = criticalResult.success ? 0 : talent.value + 1 
+    const remainingPoints = criticalResult.success ? talent.value : -1
+    const qualityLevel = criticalResult.success ? calculateQS(remainingPoints) : 0
+    
+    result.value = {
+      type: 'talent',
+      talent: talent.name,
+      rolls,
+      pointsNeeded,
+      remainingPoints,
+      success: criticalResult.success,
+      qualityLevel,
+      critical: criticalResult.message
+    }
       } else {
         let pointsNeeded = 0
         talent.attributes.forEach((attr, index) => {
@@ -251,6 +213,7 @@ const performCheck = async () => {
     }
   } catch (error) {
     console.error('Error during check:', error)
+    console.error('Error stack:', error.stack)
   }
 }
 
@@ -261,6 +224,7 @@ const formatResult = (res) => {
     return `Würfe: ${res.rolls.join(', ')} - Benötigte Punkte: ${res.pointsNeeded} - ${res.success ? 'Erfolg!' : 'Misserfolg!'}`
   }
 }
+
 </script>
 
 <style scoped>
@@ -282,8 +246,22 @@ const formatResult = (res) => {
   max-width: 1000px;
 }
 
-.dice-wrapper {
+.dice-views {
   display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.dice-roller {
+  width: 300px;
+  height: 300px;
+}
+
+.dice-wrapper {
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;

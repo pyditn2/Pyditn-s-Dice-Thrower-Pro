@@ -2,30 +2,74 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import * as THREE from 'three'
 import RAPIER from '@dimforge/rapier3d-compat'
+import { watch } from 'vue'
 
-const containerRef = ref(null)
-let scene, camera, renderer, world
-let dice = null
-let rigidBody = null
+const containerRef1 = ref(null)
+const containerRef2 = ref(null)
+const containerRef3 = ref(null)
+const showExtraViews = ref(false)
+let scene, cameras = [], renderers = [], world
+let dice = []
+let rigidBodies = []
 let animationFrameId = null
 let diceNumbers = []
-let cameraAnimation = null
 
-const cameraState = {
-  position: new THREE.Vector3(0, 8, 12),
-  target: new THREE.Vector3(0, 0, 0),
-  isAnimating: false
-}
+
+watch(showExtraViews, (newValue) => {
+  if (newValue) {
+    // Small delay to ensure DOM is updated
+    setTimeout(reinitRenderers, 0)
+  }
+})
 
 const initScene = () => {
   scene = new THREE.Scene()
-  camera = new THREE.PerspectiveCamera(45, 300 / 300, 0.1, 1000)
   
-  renderer = new THREE.WebGLRenderer({ antialias: true })
-  renderer.setSize(300, 300)
-  renderer.shadowMap.enabled = true
-  containerRef.value.innerHTML = ''
-  containerRef.value.appendChild(renderer.domElement)
+  // Create cameras
+  cameras = [
+    new THREE.PerspectiveCamera(45, 300 / 300, 0.1, 1000),
+    new THREE.PerspectiveCamera(45, 300 / 300, 0.1, 1000),
+    new THREE.PerspectiveCamera(45, 300 / 300, 0.1, 1000)
+  ]
+  
+  // Set initial camera positions
+  cameras[0].position.set(0, 8, 12)    // Main view (center)
+  cameras[1].position.set(-8, 8, 8)    // Left view
+  cameras[2].position.set(8, 8, 8)     // Right view
+  
+  cameras.forEach(camera => camera.lookAt(0, 0, 0))
+  
+  // Create renderers
+  renderers = [
+    new THREE.WebGLRenderer({ antialias: true }),
+    new THREE.WebGLRenderer({ antialias: true }),
+    new THREE.WebGLRenderer({ antialias: true })
+  ]
+  
+  // Attach first renderer (always visible)
+  renderers[0].setSize(300, 300)
+  renderers[0].shadowMap.enabled = true
+  if (containerRef1.value) {
+    containerRef1.value.innerHTML = ''
+    containerRef1.value.appendChild(renderers[0].domElement)
+  }
+
+  // Only attach other renderers if they should be shown
+  if (showExtraViews.value) {
+    renderers[1].setSize(300, 300)
+    renderers[1].shadowMap.enabled = true
+    if (containerRef2.value) {
+      containerRef2.value.innerHTML = ''
+      containerRef2.value.appendChild(renderers[1].domElement)
+    }
+
+    renderers[2].setSize(300, 300)
+    renderers[2].shadowMap.enabled = true
+    if (containerRef3.value) {
+      containerRef3.value.innerHTML = ''
+      containerRef3.value.appendChild(renderers[2].domElement)
+    }
+  }
   
   const mainLight = new THREE.DirectionalLight(0xffffff, 1)
   mainLight.position.set(5, 5, 5)
@@ -33,9 +77,6 @@ const initScene = () => {
   
   const ambientLight = new THREE.AmbientLight(0x404040)
   scene.add(ambientLight)
-  
-  camera.position.copy(cameraState.position)
-  camera.lookAt(cameraState.target)
 
   world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
 
@@ -54,6 +95,24 @@ const initScene = () => {
   
   const groundColliderDesc = RAPIER.ColliderDesc.cuboid(10.0, 0.5, 10.0)
   world.createCollider(groundColliderDesc, groundRigidBody)
+}
+
+const reinitRenderers = () => {
+  if (showExtraViews.value) {
+    renderers[1].setSize(300, 300)
+    renderers[1].shadowMap.enabled = true
+    if (containerRef2.value) {
+      containerRef2.value.innerHTML = ''
+      containerRef2.value.appendChild(renderers[1].domElement)
+    }
+
+    renderers[2].setSize(300, 300)
+    renderers[2].shadowMap.enabled = true
+    if (containerRef3.value) {
+      containerRef3.value.innerHTML = ''
+      containerRef3.value.appendChild(renderers[2].domElement)
+    }
+  }
 }
 
 const createNumberTexture = (number) => {
@@ -80,12 +139,11 @@ const createNumberTexture = (number) => {
   ctx.fillText(number.toString(), size/2, size/2)
   
   const texture = new THREE.CanvasTexture(canvas)
-  texture.center.set(0.5, 0.5)
+  texture.center.set(0.5, 0.5)  // Set rotation center to middle
   texture.needsUpdate = true
   return texture
 }
 
-// Helper function to create properly oriented label
 const createFaceLabel = (number, center, normal) => {
   const label = new THREE.Mesh(
     new THREE.PlaneGeometry(0.5, 0.5),
@@ -93,7 +151,7 @@ const createFaceLabel = (number, center, normal) => {
       map: createNumberTexture(number),
       transparent: true,
       side: THREE.DoubleSide,
-      shininess: 30,
+      shininess: 0,
       emissive: new THREE.Color(0x333333),
       emissiveIntensity: 0.2
     })
@@ -116,143 +174,105 @@ const createFaceLabel = (number, center, normal) => {
   return label
 }
 
-
-
-const createD20 = () => {
-  // Create base geometry and material for the dice
-  const geometry = new THREE.IcosahedronGeometry(1)
+const createDice = (type) => {
+  const geometry = createDiceGeometry(type)
   const material = new THREE.MeshPhongMaterial({
     color: 0xff0000,
     shininess: 30,
   })
   
   const mesh = new THREE.Mesh(geometry, material)
-  const startY = 4
+  const startY = 6
   mesh.position.set(0, startY, 0)
   
-  // - Opposite faces sum to 21
-  // - Numbers around each vertex are in sequence
-  const d20Layout = [
-    [20, 8, 14, 2, 16],    // Upper pentagon
-    [10, 12, 4, 6, 18],    // Middle strip
-    [19, 7, 13, 1, 15],    // Middle strip
-    [11, 3, 17, 5, 9]      // Lower pentagon
-  ]
+  diceNumbers = [] // Reset numbers array
   
-  // Flatten the layout into a single array
-  const numberArrangement = d20Layout.flat()
-  
-  // Rest of the code remains the same...
-  const positions = geometry.attributes.position.array
-  diceNumbers = []
-  
-  // Calculate face normals and centers
-  const faceNormals = []
-  const faceCenters = []
-  
-  for (let i = 0; i < positions.length; i += 9) {
-    const v1 = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2])
-    const v2 = new THREE.Vector3(positions[i + 3], positions[i + 4], positions[i + 5])
-    const v3 = new THREE.Vector3(positions[i + 6], positions[i + 7], positions[i + 8])
-    
-    const normal = new THREE.Vector3()
-    const center = new THREE.Vector3()
-    
-    normal.crossVectors(
-      v2.clone().sub(v1),
-      v3.clone().sub(v1)
-    ).normalize()
-    
-    center.add(v1).add(v2).add(v3).divideScalar(3)
-    
-    faceNormals.push(normal.clone())
-    faceCenters.push(center.clone())
-  }
-  
-  // Create labels with correct number arrangement using the helper function
-  for (let i = 0; i < 20; i++) {
-    const label = createFaceLabel(
-      numberArrangement[i],
-      faceCenters[i],
-      faceNormals[i]
-    )
-    mesh.add(label)
-    
-    diceNumbers.push({
-      number: numberArrangement[i],
-      normal: faceNormals[i]
-    })
-  }
-  
-  const physicsVertices = Array.from(positions)
+  // Physics setup
+  const physicsVertices = Array.from(geometry.attributes.position.array)
   const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-    .setTranslation(0, startY, 0)
+  rigidBodyDesc.setTranslation(0, startY, 0)
+  rigidBodyDesc.angularDamping = 0.5
+  rigidBodyDesc.linearDamping = 0.5
   
-  rigidBody = world.createRigidBody(rigidBodyDesc)
+  const rigidBody = world.createRigidBody(rigidBodyDesc)
   
   const colliderDesc = RAPIER.ColliderDesc.convexHull(physicsVertices)
   if (colliderDesc) {
     colliderDesc
       .setRestitution(0.3)
       .setFriction(0.8)
+      .setDensity(2.0)
     world.createCollider(colliderDesc, rigidBody)
   }
   
-  rigidBody.setLinvel(new RAPIER.Vector3(
-    Math.random() * 4 - 2,
-    4,
-    Math.random() * 4 - 2
-  ))
-  
-  rigidBody.setAngvel(new RAPIER.Vector3(
-    Math.random() * 6 - 3,
-    Math.random() * 6 - 3,
-    Math.random() * 6 - 3
-  ))
-  
-  return mesh
-}
-
-const lerp = (start, end, t) => {
-  return start + (end - start) * t
-}
-
-const animateCamera = () => {
-  if (!cameraAnimation) return
-
-  const { 
-    startPos, endPos, 
-    startTarget, endTarget, 
-    startUp, endUp,
-    startTime, duration 
-  } = cameraAnimation
-  
-  const now = Date.now()
-  const elapsed = now - startTime
-  const t = Math.min(elapsed / duration, 1)
-  const eased = t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t
-
-  // Interpolate position
-  camera.position.lerpVectors(startPos, endPos, eased)
-  
-  // Interpolate target
-  cameraState.target.lerpVectors(startTarget, endTarget, eased)
-  
-  // Interpolate up vector
-  const currentUp = new THREE.Vector3()
-  currentUp.lerpVectors(startUp, endUp, eased)
-  
-  // Apply camera orientation
-  camera.lookAt(cameraState.target)
-  camera.up.copy(currentUp)
-
-  if (t === 1) {
-    cameraAnimation = null
+  if (type === 'd20') {
+    // D20 face numbers arrangement (standard arrangement)
+    const d20Layout = [
+      20, 8, 14, 2, 16,       // Upper pentagon
+      10, 12, 4, 6, 18,       // Middle strip
+      19, 7, 13, 1, 15,       // Middle strip
+      11, 3, 17, 5, 9         // Lower pentagon
+    ]
+    
+    const positions = geometry.attributes.position.array
+    const faceNormals = []
+    const faceCenters = []
+    
+    // Calculate face centers and normals
+    for (let i = 0; i < positions.length; i += 9) {
+      const v1 = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2])
+      const v2 = new THREE.Vector3(positions[i + 3], positions[i + 4], positions[i + 5])
+      const v3 = new THREE.Vector3(positions[i + 6], positions[i + 7], positions[i + 8])
+      
+      const normal = new THREE.Vector3()
+      const center = new THREE.Vector3()
+      
+      normal.crossVectors(
+        v2.clone().sub(v1),
+        v3.clone().sub(v1)
+      ).normalize()
+      
+      center.add(v1).add(v2).add(v3).divideScalar(3)
+      
+      faceNormals.push(normal.clone())
+      faceCenters.push(center.clone())
+    }
+    
+    // Add number labels to faces and store number data
+    for (let i = 0; i < 20; i++) {
+      const label = createFaceLabel(
+        d20Layout[i],
+        faceCenters[i],
+        faceNormals[i]
+      )
+      mesh.add(label)
+      
+      // Store the number and its corresponding normal
+      diceNumbers.push({
+        number: d20Layout[i],
+        normal: faceNormals[i]
+      })
+    }
   }
+
+  return { mesh, rigidBody }
 }
 
-const getUpFacingNumber = () => {
-  if (!dice || !diceNumbers.length) return null
+const resetCamera = () => {
+  cameras.forEach((camera, index) => {
+    const defaultPositions = [
+      new THREE.Vector3(0, 8, 12),    // Main view
+      new THREE.Vector3(-8, 8, 8),    // Left view
+      new THREE.Vector3(8, 8, 8)      // Right view
+    ];
+    camera.position.copy(defaultPositions[index]);
+    camera.lookAt(0, 0, 0);
+  });
+};
+
+// Add getUpFacingNumber function:
+const getUpFacingNumber = (dice) => {
+  if (!diceNumbers.length) return null
   
   const upVector = new THREE.Vector3(0, 1, 0)
   let maxDot = -1
@@ -272,163 +292,168 @@ const getUpFacingNumber = () => {
   return result
 }
 
-const animate = () => {
-  if (world && dice && rigidBody) {
-    world.step()
-    
-    const position = rigidBody.translation()
-    const rotation = rigidBody.rotation()
-    
-    dice.position.set(position.x, position.y, position.z)
-    dice.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+const createDiceGeometry = (type) => {
+  switch (type) {
+    case 'd20':
+      return new THREE.IcosahedronGeometry(1)
+    case 'd6':
+      return new THREE.BoxGeometry(1, 1, 1)
+    default:
+      throw new Error('Unsupported dice type')
   }
-  
-  animateCamera()
-  renderer.render(scene, camera)
-  
-  animationFrameId = requestAnimationFrame(animate)
 }
 
-const calculateCameraOrientation = () => {
-  if (!dice || !diceNumbers.length) return null
+
+
+const rollDice = async (type, count) => {
+  showExtraViews.value = count > 1
+  // Make sure to properly clean up ALL previous dice
+  while (scene.children.length > 0) {
+    const object = scene.children[0];
+    scene.remove(object);
+  }
   
-  // Find which face is up
-  const upVector = new THREE.Vector3(0, 1, 0)
-  let maxDot = -1
-  let upFaceNormal = null
+  // Re-add lights and ground after clearing
+  const mainLight = new THREE.DirectionalLight(0xffffff, 1)
+  mainLight.position.set(5, 5, 5)
+  scene.add(mainLight)
   
-  diceNumbers.forEach(({ normal }) => {
-    const worldNormal = normal.clone()
-    worldNormal.applyQuaternion(dice.quaternion)
-    
-    const dot = worldNormal.dot(upVector)
-    if (dot > maxDot) {
-      maxDot = dot
-      upFaceNormal = worldNormal
+  const ambientLight = new THREE.AmbientLight(0x404040)
+  scene.add(ambientLight)
+
+  // Recreate ground
+  const groundGeometry = new THREE.PlaneGeometry(20, 20)
+  const groundMaterial = new THREE.MeshPhongMaterial({ 
+    color: 0x222222,
+    side: THREE.DoubleSide
+  })
+  const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial)
+  groundMesh.rotation.x = Math.PI / 2
+  groundMesh.position.y = 0
+  scene.add(groundMesh)
+
+  // Clear physics bodies
+  rigidBodies.forEach(rb => {
+    if (rb && world.getRigidBody(rb.handle)) {
+      world.removeRigidBody(rb)
     }
   })
   
-  if (!upFaceNormal) return null
+  dice = []
+  rigidBodies = []
 
-  const dicePosition = dice.position
-  const cameraHeight = 5
-  
-  const cameraPosition = new THREE.Vector3(
-    dicePosition.x,
-    dicePosition.y + cameraHeight,
-    dicePosition.z
-  )
-  
-  const upDirection = new THREE.Vector3(0, 0, -1)
-  
-  return {
-    position: cameraPosition,
-    target: dicePosition,
-    upVector: upDirection
+  // Create new dice
+  for (let i = 0; i < count; i++) {
+    const offset = {
+      x: (i - (count-1)/2) * 2.5,
+      y: 6 + Math.random() * 2,
+      z: Math.random() - 0.5
+    }
+    resetCamera();
+
+    const { mesh, rigidBody } = createDice(type)
+    
+    mesh.position.set(offset.x, offset.y, offset.z)
+    rigidBody.setTranslation({ x: offset.x, y: offset.y, z: offset.z })
+
+    rigidBody.setLinvel(new RAPIER.Vector3(
+      Math.random() * 8 - 4,
+      6,
+      Math.random() * 8 - 4
+    ))
+    
+    rigidBody.setAngvel(new RAPIER.Vector3(
+      Math.random() * 10 - 5,
+      Math.random() * 10 - 5,
+      Math.random() * 10 - 5
+    ))
+
+    scene.add(mesh)
+    dice.push(mesh)
+    rigidBodies.push(rigidBody)
   }
-}
-
-const moveCameraAboveDice = () => {
-  if (!dice) return
-
-  const orientation = calculateCameraOrientation()
-  if (!orientation) return
-  
-  cameraAnimation = {
-    startPos: camera.position.clone(),
-    endPos: orientation.position,
-    startTarget: cameraState.target.clone(),
-    endTarget: orientation.target,
-    startUp: new THREE.Vector3(0, 1, 0),
-    endUp: orientation.upVector,
-    startTime: Date.now(),
-    duration: 1000
-  }
-}
-
-
-
-const resetCamera = () => {
-  cameraAnimation = {
-    startPos: camera.position.clone(),
-    endPos: new THREE.Vector3(0, 8, 12),
-    startTarget: cameraState.target.clone(),
-    endTarget: new THREE.Vector3(0, 0, 0),
-    startUp: camera.up.clone(), 
-    endUp: new THREE.Vector3(0, 1, 0), 
-    startTime: Date.now(),
-    duration: 1000
-  }
-}
-
-const rollDice = async () => {
-  if (dice) {
-    scene.remove(dice)
-  }
-  if (rigidBody) {
-    world.removeRigidBody(rigidBody)
-  }
-
-  resetCamera()
-  dice = createD20()
-  scene.add(dice)
 
   return new Promise((resolve) => {
     const checkSettled = setInterval(() => {
-      if (rigidBody) {
-        const vel = rigidBody.linvel()
-        const angVel = rigidBody.angvel()
-        
-        if (Math.abs(vel.x) < 0.01 && 
-            Math.abs(vel.y) < 0.01 && 
-            Math.abs(vel.z) < 0.01 &&
-            Math.abs(angVel.x) < 0.01 &&
-            Math.abs(angVel.y) < 0.01 &&
-            Math.abs(angVel.z) < 0.01) {
-          clearInterval(checkSettled)
-          const result = getUpFacingNumber()
-          moveCameraAboveDice()
-          resolve([result])
-        }
+      const allSettled = rigidBodies.every(rb => {
+        const vel = rb.linvel()
+        const angVel = rb.angvel()
+        return Math.abs(vel.x) < 0.01 && 
+               Math.abs(vel.y) < 0.01 && 
+               Math.abs(vel.z) < 0.01 &&
+               Math.abs(angVel.x) < 0.01 &&
+               Math.abs(angVel.y) < 0.01 &&
+               Math.abs(angVel.z) < 0.01
+      })
+      
+      if (allSettled) {
+        clearInterval(checkSettled)
+        const results = dice.map(d => getUpFacingNumber(d))
+        resolve(results)
       }
     }, 100)
   })
 }
-const startRoll = () => {
-  resetCamera()
-  if (dice) {
-    scene.remove(dice)
-  }
-  if (rigidBody) {
-    world.removeRigidBody(rigidBody)
-  }
 
-  dice = createD20()
-  scene.add(dice)
-}
 
-const waitForSettling = () => {
-  return new Promise((resolve) => {
-    const checkSettled = setInterval(() => {
-      if (rigidBody) {
-        const vel = rigidBody.linvel()
-        const angVel = rigidBody.angvel()
-        
-        if (Math.abs(vel.x) < 0.01 && 
-            Math.abs(vel.y) < 0.01 && 
-            Math.abs(vel.z) < 0.01 &&
-            Math.abs(angVel.x) < 0.01 &&
-            Math.abs(angVel.y) < 0.01 &&
-            Math.abs(angVel.z) < 0.01) {
-          clearInterval(checkSettled)
-          const result = getUpFacingNumber()
-          moveCameraAboveDice()
-          resolve([result])
-        }
+const animate = () => {
+  animationFrameId = requestAnimationFrame(animate);
+  world.step();
+  
+  rigidBodies.forEach((rigidBody, index) => {
+    const position = rigidBody.translation();
+    const rotation = rigidBody.rotation();
+    dice[index].position.set(position.x, position.y, position.z);
+    dice[index].quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+    
+    // Check if die has settled
+    const velocity = rigidBody.linvel();
+    const angularVelocity = rigidBody.angvel();
+    const isSettled =
+      Math.abs(velocity.x) < 0.01 &&
+      Math.abs(velocity.y) < 0.01 &&
+      Math.abs(velocity.z) < 0.01 &&
+      Math.abs(angularVelocity.x) < 0.01 &&
+      Math.abs(angularVelocity.y) < 0.01 &&
+      Math.abs(angularVelocity.z) < 0.01;
+
+    if (showExtraViews.value && index < cameras.length) {
+      const camera = cameras[index];
+      const dicePosition = dice[index].position;
+
+      if (isSettled) {
+        // Move camera to position above settled die
+        const desiredCameraPosition = new THREE.Vector3(
+          dicePosition.x,
+          dicePosition.y + 5,
+          dicePosition.z
+        );
+        camera.position.lerp(desiredCameraPosition, 0.1);
+        camera.lookAt(dicePosition);
+      } else {
+        // Update camera position to follow die while maintaining relative angle
+        const radius = 8;
+        const currentAngle = Math.atan2(
+          camera.position.z - dicePosition.z,
+          camera.position.x - dicePosition.x
+        );
+        camera.position.set(
+          dicePosition.x + radius * Math.cos(currentAngle),
+          dicePosition.y + 5,
+          dicePosition.z + radius * Math.sin(currentAngle)
+        );
+        camera.lookAt(dicePosition);
       }
-    }, 100)
-  })
-}
+    }
+  });
+  
+  // Render each view
+  renderers.forEach((renderer, index) => {
+    if (index === 0 || (showExtraViews.value && index < dice.length)) {
+      renderer.render(scene, cameras[index]);
+    }
+  });
+};
 
 onMounted(async () => {
   await RAPIER.init()
@@ -443,24 +468,45 @@ onBeforeUnmount(() => {
 })
 
 defineExpose({ 
-  rollDice, 
-  startRoll, 
-  waitForSettling,
-  resetCamera
+  rollDice
 })
 </script>
 
 <template>
-  <div ref="containerRef" class="dice-container"></div>
+  <div class="dice-views-container">
+    <div class="dice-views">
+      <div ref="containerRef1" class="dice-container"></div>
+      <div v-if="showExtraViews" ref="containerRef2" class="dice-container"></div>
+      <div v-if="showExtraViews" ref="containerRef3" class="dice-container"></div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
+.dice-views-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.dice-views {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  justify-content: center;
+}
+
 .dice-container {
   width: 300px;
   height: 300px;
   background-color: #1a1a1a;
-  margin: 1rem auto;
   border-radius: 8px;
   overflow: hidden;
+}
+
+@media (max-width: 960px) {
+  .dice-views {
+    flex-direction: column;
+  }
 }
 </style>
