@@ -5,7 +5,22 @@
     <!-- Dice roller container -->
     <div class="dice-rollers">
   <div class="dice-views">
-    <DiceRoller ref="diceRoller1" class="dice-roller" />
+    <div class="dice-wrapper">
+      <DiceRoller ref="diceRoller1" class="dice-roller" />
+      <!-- Single label for attribute check -->
+      <div v-if="checkType === 'attribute'" class="single-dice-label">
+        {{ selectedAttribute }} ({{ characterStore.stats.attributes[selectedAttribute] }})
+      </div>
+      <!-- Three labels for talent check -->
+      <div v-else-if="selectedTalentData" class="talent-dice-labels">
+        <div v-for="(attr, index) in selectedTalentData.attributes" 
+             :key="index" 
+             class="dice-label"
+             :style="{ width: '300px' }">
+          {{ attr }} ({{ characterStore.stats.attributes[attr] }})
+        </div>
+      </div>
+    </div>
   </div>
 </div>
     
@@ -82,7 +97,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUpdate } from 'vue'
 import { useCharacterStore } from '../stores/characterStore'
 import DiceRoller from './DiceRoller.vue'
 
@@ -92,6 +107,7 @@ const checkType = ref('attribute')
 const selectedAttribute = ref('MU')
 const selectedTalent = ref('')
 const result = ref(null)
+const diceRollers = ref([])
 
 // Get talents from store
 const talents = computed(() => {
@@ -118,7 +134,11 @@ const getAttributeValue = (attr) => {
 }
 
 const resetAllCameras = () => {
-  if (diceRoller1.value) diceRoller1.value.resetCamera();
+  if (checkType.value === 'attribute') {
+    diceRoller1.value?.resetCamera()
+  } else {
+    diceRollers.forEach(roller => roller?.resetCamera())
+  }
 }
 
 const calculateQS = (remainingPoints) => {
@@ -154,6 +174,7 @@ const performCheck = async () => {
       result.value = {
         type: 'attribute',
         attribute: selectedAttribute.value,
+        rolls: [roll[0]],
         roll: roll[0],
         target: attributeValue,
         success,
@@ -164,13 +185,12 @@ const performCheck = async () => {
     } else {
       const talent = talents.value.find(t => t.name === selectedTalent.value)
       if (!talent) return
-  
-  // Use single DiceRoller instance for all dice
+
       const rolls = await diceRoller1.value.rollDice('d20', 3)
-      console.log('Rolls:', rolls)
+      const flatRolls = rolls.flat()
   
   // Check for critical rolls first
-      const criticalResult = checkCriticalRolls(rolls)
+  const criticalResult = checkCriticalRolls(flatRolls)
   
   if (criticalResult) {
     const pointsNeeded = criticalResult.success ? 0 : talent.value + 1 
@@ -187,12 +207,12 @@ const performCheck = async () => {
       qualityLevel,
       critical: criticalResult.message
     }
-      } else {
+  } else {
         let pointsNeeded = 0
         talent.attributes.forEach((attr, index) => {
           const attrValue = characterStore.stats.attributes[attr]
-          if (rolls[index] > attrValue) {
-            pointsNeeded += rolls[index] - attrValue
+          if (flatRolls[index] > attrValue) {
+            pointsNeeded += flatRolls[index] - attrValue
           }
         })
         
@@ -203,7 +223,7 @@ const performCheck = async () => {
         result.value = {
           type: 'talent',
           talent: talent.name,
-          rolls,
+          rolls: flatRolls,
           pointsNeeded,
           remainingPoints,
           success,
@@ -223,7 +243,13 @@ const formatResult = (res) => {
   } else {
     return `Würfe: ${res.rolls.join(', ')} - Benötigte Punkte: ${res.pointsNeeded} - ${res.success ? 'Erfolg!' : 'Misserfolg!'}`
   }
+
+
 }
+
+onBeforeUpdate(() => {
+  diceRollers.value = []
+})
 
 </script>
 
@@ -261,15 +287,43 @@ const formatResult = (res) => {
   height: 300px;
 }
 
+.talent-dice-views {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .dice-wrapper {
+  display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
 }
 
-.dice-label {
-  color: #999;
+.single-dice-label {
+  text-align: center;
+  color: #42b983;
+  font-weight: bold;
   font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.talent-dice-labels {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 0 1rem;
+  margin-top: 0.5rem;
+}
+
+.dice-label {
+  text-align: center;
+  color: #42b983;
+  font-weight: bold;
+  font-size: 0.9rem;
+  flex: 1;
+  margin: 0 0.5rem;
 }
 
 .dice-roller {

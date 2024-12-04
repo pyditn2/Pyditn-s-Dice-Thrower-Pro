@@ -117,34 +117,29 @@ const initScene = () => {
   
   // Create renderers
   renderers = [
-    new THREE.WebGLRenderer({ antialias: true }),
-    new THREE.WebGLRenderer({ antialias: true }),
-    new THREE.WebGLRenderer({ antialias: true })
+    new THREE.WebGLRenderer({ antialias: false }),
+    new THREE.WebGLRenderer({ antialias: false }),
+    new THREE.WebGLRenderer({ antialias: false })
   ]
   
   // Attach first renderer (always visible)
-  renderers[0].setSize(300, 300)
-  renderers[0].shadowMap.enabled = true
+  renderers.forEach(renderer => {
+    renderer.setSize(300, 300)
+    renderer.shadowMap.enabled = true
+  })
+
+  // Always attach all renderers to containers
   if (containerRef1.value) {
     containerRef1.value.innerHTML = ''
     containerRef1.value.appendChild(renderers[0].domElement)
   }
-
-  // Only attach other renderers if they should be shown
-  if (showExtraViews.value) {
-    renderers[1].setSize(300, 300)
-    renderers[1].shadowMap.enabled = true
-    if (containerRef2.value) {
-      containerRef2.value.innerHTML = ''
-      containerRef2.value.appendChild(renderers[1].domElement)
-    }
-
-    renderers[2].setSize(300, 300)
-    renderers[2].shadowMap.enabled = true
-    if (containerRef3.value) {
-      containerRef3.value.innerHTML = ''
-      containerRef3.value.appendChild(renderers[2].domElement)
-    }
+  if (containerRef2.value) {
+    containerRef2.value.innerHTML = ''
+    containerRef2.value.appendChild(renderers[1].domElement)
+  }
+  if (containerRef3.value) {
+    containerRef3.value.innerHTML = ''
+    containerRef3.value.appendChild(renderers[2].domElement)
   }
   
   const mainLight = new THREE.DirectionalLight(0xffffff, 1)
@@ -458,8 +453,8 @@ defineExpose({
   <div class="dice-views-container">
     <div class="dice-views">
       <div ref="containerRef1" class="dice-container"></div>
-      <div v-if="showExtraViews" ref="containerRef2" class="dice-container"></div>
-      <div v-if="showExtraViews" ref="containerRef3" class="dice-container"></div>
+      <div v-show="showExtraViews" ref="containerRef2" class="dice-container"></div>
+      <div v-show="showExtraViews" ref="containerRef3" class="dice-container"></div>
     </div>
   </div>
 </template>
