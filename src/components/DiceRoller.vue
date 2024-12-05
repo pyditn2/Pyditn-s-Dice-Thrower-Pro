@@ -22,12 +22,24 @@ let rigidBodies = []
 let animationFrameId = null
 const diceManager = new DiceManager()
 
+const MAX_SUBSTEPS = 3 
+let lastTime = 0
+let accumulator = 0
+
 let rotationAngle = 0
 const ROTATION_SPEED = 0.003
 let lastSettleTime = null
 const SETTLE_DISPLAY_DURATION = 5000 // 5 seconds in milliseconds
 const isRotating = ref(true)
 
+const FIXED_TIME_STEP = 1/60
+const GRAVITY = -25  // Increased from -9.81 for faster falls
+const INITIAL_THROW_SPEED = 15  // Increased from 5 for more energetic throws
+const INITIAL_SPIN_SPEED = 20   // Increased from 10 for more rotation
+const DICE_SIZE = 0.02  // Kept the same for consistent scale
+
+let previousState = new Map()
+let currentState = new Map()
 
 watch(showExtraViews, (newValue) => {
   if (newValue) {
@@ -239,7 +251,15 @@ const initScene = () => {
   const ambientLight = new THREE.AmbientLight(0x404040)
   scene.add(ambientLight)
 
-  world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
+  world = new RAPIER.World({ 
+    x: 0, 
+    y: GRAVITY,
+    z: 0 
+  })
+  world.timestep = FIXED_TIME_STEP
+  
+  previousState = new Map()
+  currentState = new Map()
   createGround();
 }
 
@@ -295,28 +315,22 @@ const createDiceInstance = (type, index, count) => {
 
     const { mesh, rigidBody } = diceManager.createDice(type, world)
     
-    // Set initial position
     mesh.position.set(offset.x, offset.y, offset.z)
     rigidBody.setTranslation(offset)
 
-    // Set initial linear velocity
+    // Higher initial velocities for more dynamic movement
     const linvel = new RAPIER.Vector3(
-      Math.random() * (DICE_INITIAL_CONFIG.initialVelocity.x.max - DICE_INITIAL_CONFIG.initialVelocity.x.min) + 
-      DICE_INITIAL_CONFIG.initialVelocity.x.min,
-      DICE_INITIAL_CONFIG.initialVelocity.y.base,
-      Math.random() * (DICE_INITIAL_CONFIG.initialVelocity.z.max - DICE_INITIAL_CONFIG.initialVelocity.z.min) + 
-      DICE_INITIAL_CONFIG.initialVelocity.z.min
+      Math.random() * 20 - 10,  // Increased range of horizontal velocity
+      15,                       // Higher upward throw
+      Math.random() * 20 - 10   // Increased range of forward/backward velocity
     )
     rigidBody.setLinvel(linvel)
 
-    // Set initial angular velocity
+    // Higher angular velocities for more spinning
     const angvel = new RAPIER.Vector3(
-      Math.random() * (DICE_INITIAL_CONFIG.angularVelocity.max - DICE_INITIAL_CONFIG.angularVelocity.min) + 
-      DICE_INITIAL_CONFIG.angularVelocity.min,
-      Math.random() * (DICE_INITIAL_CONFIG.angularVelocity.max - DICE_INITIAL_CONFIG.angularVelocity.min) + 
-      DICE_INITIAL_CONFIG.angularVelocity.min,
-      Math.random() * (DICE_INITIAL_CONFIG.angularVelocity.max - DICE_INITIAL_CONFIG.angularVelocity.min) + 
-      DICE_INITIAL_CONFIG.angularVelocity.min
+      Math.random() * 30 - 15,  // Increased rotation speeds
+      Math.random() * 30 - 15,
+      Math.random() * 30 - 15
     )
     rigidBody.setAngvel(angvel)
 
@@ -350,28 +364,17 @@ const rollDice = async (type, count) => {
     cleanupScene()
     cleanupPhysics()
 
+    if (cameraManager) {
+      cameraManager.reset()
+    }
+
     // Create new dice instances
     for (let i = 0; i < count; i++) {
-      resetCamera()
       const { mesh, rigidBody } = createDiceInstance(type, i, count)
       
       scene.add(mesh)
       dice.push(mesh)
       rigidBodies.push(rigidBody)
-
-      // Initialize camera for this die
-      if (i < cameras.length) {
-        const camera = cameras[i]
-        // Set initial camera position based on die number
-        const radius = 8
-        const angle = (2 * Math.PI * i) / count
-        camera.position.set(
-          Math.cos(angle) * radius,
-          8,
-          Math.sin(angle) * radius
-        )
-        camera.lookAt(0, 0, 0)
-      }
     }
 
     // Wait for dice to settle and return results
@@ -398,11 +401,77 @@ const rollDice = async (type, count) => {
 }
 
 
-const animate = () => {
+const animate = (currentTime) => {
   animationFrameId = requestAnimationFrame(animate)
-  world.step()
+  
+  if (lastTime === 0) {
+    lastTime = currentTime
+    return
+  }
 
-  rotationAngle += ROTATION_SPEED
+  const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1)
+  lastTime = currentTime
+  
+  // Store previous state before physics step
+  rigidBodies.forEach((rb, index) => {
+    if (rb) {
+      previousState.set(index, {
+        position: rb.translation(),
+        rotation: rb.rotation()
+      })
+    }
+  })
+  
+  // Fixed timestep physics update
+  accumulator += deltaTime
+  while (accumulator >= FIXED_TIME_STEP) {
+    world.step()
+    accumulator -= FIXED_TIME_STEP
+  }
+
+  // Store current state after physics
+  rigidBodies.forEach((rb, index) => {
+    if (rb) {
+      currentState.set(index, {
+        position: rb.translation(),
+        rotation: rb.rotation()
+      })
+    }
+  })
+
+  // Calculate interpolation alpha
+  const alpha = accumulator / FIXED_TIME_STEP
+
+  // Interpolate visual state
+  rigidBodies.forEach((rb, index) => {
+    if (!rb) return
+    
+    const previous = previousState.get(index)
+    const current = currentState.get(index)
+    
+    if (previous && current && dice[index]) {
+      // Interpolate position
+      dice[index].position.lerpVectors(
+        new THREE.Vector3(previous.position.x, previous.position.y, previous.position.z),
+        new THREE.Vector3(current.position.x, current.position.y, current.position.z),
+        alpha
+      )
+      
+      // Interpolate rotation
+      const prevQuat = new THREE.Quaternion(
+        previous.rotation.x, previous.rotation.y, 
+        previous.rotation.z, previous.rotation.w
+      )
+      const currQuat = new THREE.Quaternion(
+        current.rotation.x, current.rotation.y, 
+        current.rotation.z, current.rotation.w
+      )
+      dice[index].quaternion.slerpQuaternions(prevQuat, currQuat, alpha)
+    }
+  })
+  
+  // Time-based camera rotation (independent of frame rate)
+  rotationAngle += ROTATION_SPEED * deltaTime
   
   updateDicePhysics()
   
@@ -416,7 +485,6 @@ const animate = () => {
   
   cameraManager.update(dice, settledDice.value, rotationAngle)
   
-  // Render each view
   renderers.forEach((renderer, index) => {
     if (index === 0 || (showExtraViews.value && index < dice.length)) {
       renderer.render(scene, cameraManager.getCameras()[index])
@@ -426,14 +494,16 @@ const animate = () => {
 
 onMounted(async () => {
   try {
-    await RAPIER.init();
-    initScene();
-    cameraManager = new CameraManager(scene, 300, 300);
-    animate();
+    await RAPIER.init()
+    initScene()
+    cameraManager = new CameraManager(scene, 300, 300)
+    lastTime = 0
+    accumulator = 0
+    animate(0)
   } catch (error) {
-    console.error('Error in mounted hook:', error);
+    console.error('Error in mounted hook:', error)
   }
-});
+})
 
 onBeforeUnmount(() => {
   if (animationFrameId) {

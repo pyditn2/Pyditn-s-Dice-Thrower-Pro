@@ -3,10 +3,14 @@ import * as THREE from 'three'
 export class CameraManager {
   constructor(scene, containerWidth, containerHeight) {
     this.cameras = []
-    this.cameraStates = []  // Individual state for each camera
+    this.cameraStates = []
     this.settleTime = null
     this.SETTLE_DISPLAY_DURATION = 5000
-    this.NUMBER_OF_CAMERAS = 3  // Define fixed number of cameras
+    this.NUMBER_OF_CAMERAS = 3
+    this.hasCompletedTopdown = new Set()
+    this.rotationSpeeds = new Array(this.NUMBER_OF_CAMERAS).fill(0).map(() => Math.random() * 0.001 + 0.001)
+    this.individualRotationAngles = new Array(this.NUMBER_OF_CAMERAS).fill(0)
+    this.lastDiePositions = new Array(this.NUMBER_OF_CAMERAS).fill(null)
     this.setupCameras(containerWidth, containerHeight)
   }
 
@@ -16,7 +20,7 @@ export class CameraManager {
       new THREE.PerspectiveCamera(45, width / height, 0.1, 1000)
     )
 
-    // Initialize state for each camera
+    // Initialize state for each camera with default values
     this.cameraStates = Array(this.NUMBER_OF_CAMERAS).fill(null).map(() => ({
       mode: 'overview',
       settleTime: null
@@ -25,63 +29,70 @@ export class CameraManager {
     this.resetCameras()
   }
 
-  setMode(mode, index, force = false) {
-    // Safety check for index
-    if (index < 0 || index >= this.NUMBER_OF_CAMERAS) {
-      console.warn(`Invalid camera index: ${index}`)
-      return
+  reset() {
+    this.hasCompletedTopdown.clear()
+    this.individualRotationAngles = new Array(this.NUMBER_OF_CAMERAS).fill(0)
+    this.lastDiePositions = new Array(this.NUMBER_OF_CAMERAS).fill(null)
+    this.cameraStates.forEach(state => {
+      state.mode = 'overview'
+      state.settleTime = null
+    })
+  }
+
+  setMode(mode, index = 0, force = false) {
+    if (index < 0) index = 0
+    if (index >= this.NUMBER_OF_CAMERAS) index = this.NUMBER_OF_CAMERAS - 1
+
+    if (!this.cameraStates[index]) {
+      this.cameraStates[index] = {
+        mode: 'overview',
+        settleTime: null
+      }
     }
 
     const state = this.cameraStates[index]
-    if (!state) {
-      console.warn(`No state found for camera ${index}`)
-      return
-    }
     
-    if (mode === 'topdown' && state.mode !== 'topdown') {
-      state.settleTime = Date.now()
-    }
-    
-    if (force) {
-      state.mode = mode
-      state.settleTime = null
+    // If die has already completed topdown view, keep it in rotating
+    if (this.hasCompletedTopdown.has(index) && mode === 'topdown') {
       return
     }
 
-    // Handle mode transitions for individual camera
-    if (state.mode === 'topdown') {
+    // Handle topdown mode entry
+    if (mode === 'topdown' && state.mode !== 'topdown') {
+      state.settleTime = Date.now()
+    }
+
+    // Check for topdown to rotating transition
+    if (state.mode === 'topdown' && state.settleTime) {
       if (Date.now() - state.settleTime > this.SETTLE_DISPLAY_DURATION) {
         state.mode = 'rotating'
-        state.settleTime = null
+        this.hasCompletedTopdown.add(index)
+        return
       }
-    } else {
+    }
+
+    // Set new mode if not in topdown or if forced
+    if (force || state.mode !== 'topdown') {
       state.mode = mode
     }
   }
 
   update(dice, settledDice, rotationAngle) {
     this.cameras.forEach((camera, index) => {
-      if (!this.cameraStates[index]) {
-        console.warn(`No state found for camera ${index}`)
-        return
-      }
-  
-      const state = this.cameraStates[index]
+      if (!this.cameraStates[index]) return
       
-      // Check for transition from topdown to rotating
-      if (state.mode === 'topdown' && state.settleTime) {
-        if (Date.now() - state.settleTime > this.SETTLE_DISPLAY_DURATION) {
-          this.setMode('rotating', index, true)
-        }
-      }
-  
-      // Get corresponding die or use first die for single die rolls
+      const state = this.cameraStates[index]
       const die = dice[index] || (index === 0 ? dice[0] : null)
       
       switch (state.mode) {
         case 'rotating':
-        case 'overview':
           this.updateRotatingCamera(camera, index, rotationAngle)
+          break
+          
+        case 'topdown':
+          if (die) {
+            this.updateTopdownCamera(camera, die)
+          }
           break
           
         case 'following':
@@ -92,24 +103,30 @@ export class CameraManager {
           }
           break
           
-        case 'topdown':
-          if (die) {
-            this.updateTopdownCamera(camera, die)
-          }
+        case 'overview':
+          this.updateRotatingCamera(camera, index, rotationAngle)
           break
       }
     })
   }
 
   updateRotatingCamera(camera, index, rotationAngle) {
-    const radius = 12
-    const angle = (2 * Math.PI * index) / this.cameras.length + rotationAngle
-    const x = Math.cos(angle) * radius
-    const z = Math.sin(angle) * radius
-    const y = 8
+    const radius = 8 // Slightly smaller radius for tighter rotation
+    
+    // Update individual rotation angle
+    this.individualRotationAngles[index] += this.rotationSpeeds[index]
+    const totalAngle = rotationAngle + this.individualRotationAngles[index]
+    
+    // Get the die position this camera was last looking at
+    const diePosition = this.lastDiePositions[index] || new THREE.Vector3(0, 0, 0)
+    
+    // Calculate camera position relative to the die
+    const x = diePosition.x + Math.cos(totalAngle) * radius
+    const z = diePosition.z + Math.sin(totalAngle) * radius
+    const y = diePosition.y + 5 // Keep camera slightly above the die
     
     camera.position.lerp(new THREE.Vector3(x, y, z), 0.02)
-    camera.lookAt(0, 0, 0)
+    camera.lookAt(diePosition) // Look at the die instead of origin
   }
 
   resetCameras() {
@@ -144,6 +161,11 @@ export class CameraManager {
 
   updateTopdownCamera(camera, die) {
     const diePosition = die.position
+    const index = this.cameras.indexOf(camera)
+    
+    // Store die position for later use in rotating mode
+    this.lastDiePositions[index] = diePosition.clone()
+    
     const desiredPosition = new THREE.Vector3(
       diePosition.x,
       diePosition.y + 5,
