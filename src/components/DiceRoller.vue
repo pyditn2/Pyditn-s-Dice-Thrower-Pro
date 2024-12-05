@@ -41,6 +41,28 @@ const DICE_SIZE = 0.02  // Kept the same for consistent scale
 let previousState = new Map()
 let currentState = new Map()
 
+const setupMainLight = () => {
+  const mainLight = new THREE.DirectionalLight(0xffffff, 1)
+  mainLight.position.set(5, 10, 5)
+  mainLight.castShadow = true
+  // Configure shadow properties
+  mainLight.shadow.mapSize.width = 1024
+  mainLight.shadow.mapSize.height = 1024
+  mainLight.shadow.camera.near = 0.5
+  mainLight.shadow.camera.far = 50
+  mainLight.shadow.camera.left = -10
+  mainLight.shadow.camera.right = 10
+  mainLight.shadow.camera.top = 10
+  mainLight.shadow.camera.bottom = -10
+  
+  // Add these shadow bias settings
+  mainLight.shadow.bias = -0.001        // Reduce shadow acne
+  mainLight.shadow.normalBias = 0.02    // Improve contact shadows
+  mainLight.shadow.radius = 1.5         // Soften shadow edges slightly
+  
+  return mainLight
+}
+
 watch(showExtraViews, (newValue) => {
   if (newValue) {
     // Small delay to ensure DOM is updated
@@ -145,7 +167,8 @@ const createGround = () => {
   })
   const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial)
   groundMesh.rotation.x = Math.PI / 2
-  groundMesh.position.y = 0
+  groundMesh.position.y = -0.001
+  groundMesh.receiveShadow = true
   scene.add(groundMesh)
 
   // Create walls
@@ -165,6 +188,7 @@ const createGround = () => {
     wallMesh.position.set(...wall.pos);
     wallMesh.scale.set(...wall.scale);
     wallMesh.rotation.set(...wall.rot);
+    wallMesh.receiveShadow = true
     
     scene.add(wallMesh);
   });
@@ -228,6 +252,9 @@ const initScene = () => {
   renderers.forEach(renderer => {
     renderer.setSize(300, 300)
     renderer.shadowMap.enabled = true
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    renderer.shadowMap.autoUpdate = true
+    renderer.shadowMap.needsUpdate = true
   })
 
   // Always attach all renderers to containers
@@ -244,12 +271,8 @@ const initScene = () => {
     containerRef3.value.appendChild(renderers[2].domElement)
   }
   
-  const mainLight = new THREE.DirectionalLight(0xffffff, 1)
-  mainLight.position.set(5, 5, 5)
-  scene.add(mainLight)
-  
-  const ambientLight = new THREE.AmbientLight(0x404040)
-  scene.add(ambientLight)
+  scene.add(setupMainLight())
+  scene.add(new THREE.AmbientLight(0x404040))
 
   world = new RAPIER.World({ 
     x: 0, 
@@ -270,13 +293,9 @@ const cleanupScene = () => {
     scene.remove(scene.children[0])
   }
 
-  // Add back basic scene elements
-  const mainLight = new THREE.DirectionalLight(0xffffff, 1)
-  mainLight.position.set(5, 5, 5)
-  scene.add(mainLight)
-
-  const ambientLight = new THREE.AmbientLight(0x404040)
-  scene.add(ambientLight)
+  // Add back basic scene elements with shadows
+  scene.add(setupMainLight())
+  scene.add(new THREE.AmbientLight(0x404040))
 
   createGround()
 }

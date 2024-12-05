@@ -45,6 +45,7 @@ export class DiceManager {
       })
     )
     
+    label.castShadow = true  // Add shadow casting to labels
     label.position.copy(center.clone().multiplyScalar(1.01))
     
     const up = new THREE.Vector3(0, 1, 0)
@@ -89,9 +90,12 @@ export class DiceManager {
     const material = new THREE.MeshPhongMaterial({
       color: 0xff0000,
       shininess: 30,
+      shadowSide: THREE.BackSide,
+      receiveShadow: true
     })
     
     const mesh = new THREE.Mesh(geometry, material)
+    mesh.castShadow = true
     const startY = 6
     mesh.position.set(0, startY, 0)
     
