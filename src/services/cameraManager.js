@@ -8,9 +8,10 @@ export class CameraManager {
     this.SETTLE_DISPLAY_DURATION = 5000
     this.NUMBER_OF_CAMERAS = 3
     this.hasCompletedTopdown = new Set()
-    this.rotationSpeeds = new Array(this.NUMBER_OF_CAMERAS).fill(0).map(() => Math.random() * 0.001 + 0.001)
+    this.rotationSpeeds = new Array(this.NUMBER_OF_CAMERAS).fill(0).map(() => Math.random() * 0.5 + 0.5) // 0.5 to 1.0 radians per second
     this.individualRotationAngles = new Array(this.NUMBER_OF_CAMERAS).fill(0)
     this.lastDiePositions = new Array(this.NUMBER_OF_CAMERAS).fill(null)
+    this.lastUpdateTime = Date.now()
     this.setupCameras(containerWidth, containerHeight)
   }
 
@@ -33,11 +34,13 @@ export class CameraManager {
     this.hasCompletedTopdown.clear()
     this.individualRotationAngles = new Array(this.NUMBER_OF_CAMERAS).fill(0)
     this.lastDiePositions = new Array(this.NUMBER_OF_CAMERAS).fill(null)
+    this.lastUpdateTime = Date.now()
     this.cameraStates.forEach(state => {
       state.mode = 'overview'
       state.settleTime = null
     })
   }
+
 
   setMode(mode, index = 0, force = false) {
     if (index < 0) index = 0
@@ -78,6 +81,11 @@ export class CameraManager {
   }
 
   update(dice, settledDice, rotationAngle) {
+    // Calculate delta time in seconds
+    const currentTime = Date.now()
+    const deltaTime = (currentTime - this.lastUpdateTime) / 1000
+    this.lastUpdateTime = currentTime
+
     this.cameras.forEach((camera, index) => {
       if (!this.cameraStates[index]) return
       
@@ -86,47 +94,42 @@ export class CameraManager {
       
       switch (state.mode) {
         case 'rotating':
-          this.updateRotatingCamera(camera, index, rotationAngle)
+          this.updateRotatingCamera(camera, index, rotationAngle, deltaTime)
           break
-          
         case 'topdown':
           if (die) {
             this.updateTopdownCamera(camera, die)
           }
           break
-          
         case 'following':
           if (die) {
             this.updateFollowingCamera(camera, die)
           } else {
-            this.updateRotatingCamera(camera, index, rotationAngle)
+            this.updateRotatingCamera(camera, index, rotationAngle, deltaTime)
           }
           break
-          
         case 'overview':
-          this.updateRotatingCamera(camera, index, rotationAngle)
+          this.updateRotatingCamera(camera, index, rotationAngle, deltaTime)
           break
       }
     })
   }
 
-  updateRotatingCamera(camera, index, rotationAngle) {
-    const radius = 8 // Slightly smaller radius for tighter rotation
+  updateRotatingCamera(camera, index, rotationAngle, deltaTime) {
+    const radius = 8
     
-    // Update individual rotation angle
-    this.individualRotationAngles[index] += this.rotationSpeeds[index]
+    // Update rotation angle based on time
+    this.individualRotationAngles[index] += this.rotationSpeeds[index] * deltaTime
     const totalAngle = rotationAngle + this.individualRotationAngles[index]
     
-    // Get the die position this camera was last looking at
     const diePosition = this.lastDiePositions[index] || new THREE.Vector3(0, 0, 0)
     
-    // Calculate camera position relative to the die
     const x = diePosition.x + Math.cos(totalAngle) * radius
     const z = diePosition.z + Math.sin(totalAngle) * radius
-    const y = diePosition.y + 5 // Keep camera slightly above the die
+    const y = diePosition.y + 5
     
     camera.position.lerp(new THREE.Vector3(x, y, z), 0.02)
-    camera.lookAt(diePosition) // Look at the die instead of origin
+    camera.lookAt(diePosition)
   }
 
   resetCameras() {

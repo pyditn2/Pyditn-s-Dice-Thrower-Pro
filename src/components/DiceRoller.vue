@@ -219,9 +219,9 @@ const initScene = () => {
   
   // Create renderers
   renderers = [
-    new THREE.WebGLRenderer({ antialias: false }),
-    new THREE.WebGLRenderer({ antialias: false }),
-    new THREE.WebGLRenderer({ antialias: false })
+    new THREE.WebGLRenderer({ antialias: true }),
+    new THREE.WebGLRenderer({ antialias: true }),
+    new THREE.WebGLRenderer({ antialias: true })
   ]
   
   // Attach first renderer (always visible)
