@@ -1,113 +1,18 @@
-<template>
-  <div class="dice-check">
-    <h2>Würfelprobe</h2>
-    
-    <!-- Dice roller container -->
-    <div class="dice-rollers">
-  <div class="dice-views">
-    <div class="dice-wrapper">
-      <DiceRoller ref="diceRoller1" class="dice-roller" />
-      <!-- Single label for attribute check -->
-      <div v-if="checkType === 'attribute'" class="single-dice-label">
-        {{ selectedAttribute }} ({{ characterStore.stats.attributes[selectedAttribute] }})
-      </div>
-      <!-- Three labels for talent check -->
-      <div v-else-if="selectedTalentData" class="talent-dice-labels">
-        <div v-for="(attr, index) in selectedTalentData.attributes" 
-             :key="index" 
-             class="dice-label"
-             :style="{ width: '300px' }">
-          {{ attr }} ({{ characterStore.stats.attributes[attr] }})
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-    
-    <!-- Controls -->
-    <div class="controls">
-      <div class="check-type">
-        <button 
-          :class="{ active: checkType === 'attribute' }"
-          @click="checkType = 'attribute'"
-        >
-          Eigenschaftsprobe
-        </button>
-        <button 
-          :class="{ active: checkType === 'talent' }"
-          @click="checkType = 'talent'"
-        >
-          Talentprobe
-        </button>
-      </div>
-      
-      <div class="selection" v-if="checkType === 'attribute'">
-        <select v-model="selectedAttribute">
-          <option value="MU">Mut</option>
-          <option value="KL">Klugheit</option>
-          <option value="IN">Intuition</option>
-          <option value="CH">Charisma</option>
-          <option value="FF">Fingerfertigkeit</option>
-          <option value="GE">Gewandheit</option>
-          <option value="KO">Konstitution</option>
-          <option value="KK">Körperkraft</option>
-        </select>
-      </div>
-      
-      <div v-if="checkType === 'talent'" class="talent-selection">
-        <select v-model="selectedTalent">
-          <option v-for="talent in talents" :key="talent.name" :value="talent.name">
-            {{ talent.name }} ({{ talent.value }})
-          </option>
-        </select>
-        <div v-if="selectedTalentData" class="talent-info">
-          Talentwert: {{ selectedTalentData.value }}
-        </div>
-      </div>
-      
-      <div class="button-group">
-        <button class="roll-button" @click="performCheck">
-          Würfeln
-        </button>
-        <button 
-          v-if="checkType === 'talent'" 
-          class="camera-reset-button" 
-          @click="resetAllCameras"
-        >
-          📷🔃
-        </button>
-      </div>
-    </div>
-    
-    <!-- Result display -->
-    <div v-if="result" class="result" :class="{ 
-      success: result.success,
-      critical: result.critical && result.success,
-      fumble: result.critical && !result.success
-    }">
-      <div class="success-indicator">
-        {{ result.critical || (result.success ? 'Erfolg!' : 'Misserfolg!') }}
-      </div>
-      <div v-if="result.success" class="result-qs">QS {{ result.qualityLevel }}</div>
-      <div class="result-line">Würfe: {{ result.rolls.join(', ') }}</div>
-      <div class="result-line">Benötigte Punkte: {{ result.pointsNeeded }}</div>
-      <div v-if="result.success" class="result-line">Übrige Punkte: {{ result.remainingPoints }}</div>
-    </div>
-  </div>
-</template>
-
 <script setup>
-import { ref, computed, onBeforeUpdate } from 'vue'
+import { ref, computed } from 'vue'
 import { useCharacterStore } from '../stores/characterStore'
+import { useDiceRollerStore } from '../stores/diceRollerStore'
 import DiceRoller from './DiceRoller.vue'
+import { CHECK_TYPES, DICE_TYPES } from '../constants/diceTypes'
 
 const characterStore = useCharacterStore()
+const diceRollerStore = useDiceRollerStore()
 const diceRoller1 = ref(null)
-const checkType = ref('attribute')
 const selectedAttribute = ref('MU')
 const selectedTalent = ref('')
 const result = ref(null)
 const diceRollers = ref([])
+const currentCheckType = ref(CHECK_TYPES.ATTRIBUTE)
 
 // Get talents from store
 const talents = computed(() => {
@@ -128,13 +33,8 @@ const selectedTalentData = computed(() => {
   return null
 })
 
-// Helper function to get attribute value
-const getAttributeValue = (attr) => {
-  return characterStore.stats.attributes[attr] || 0
-}
-
 const resetAllCameras = () => {
-  if (checkType.value === 'attribute') {
+  if (currentCheckType.value === CHECK_TYPES.ATTRIBUTE) {
     diceRoller1.value?.resetCamera()
   } else {
     diceRollers.forEach(roller => roller?.resetCamera())
@@ -142,28 +42,31 @@ const resetAllCameras = () => {
 }
 
 const calculateQS = (remainingPoints) => {
-  if (remainingPoints >= 16) return 6;
-  if (remainingPoints >= 13) return 5;
-  if (remainingPoints >= 10) return 4;
-  if (remainingPoints >= 7) return 3;
-  if (remainingPoints >= 4) return 2;
-  return 1;
+  if (remainingPoints >= 16) return 6
+  if (remainingPoints >= 13) return 5
+  if (remainingPoints >= 10) return 4
+  if (remainingPoints >= 7) return 3
+  if (remainingPoints >= 4) return 2
+  return 1
 }
 
 const checkCriticalRolls = (rolls) => {
-  const ones = rolls.filter(r => r === 1).length;
-  const twenties = rolls.filter(r => r === 20).length;
+  const ones = rolls.filter(r => r === 1).length
+  const twenties = rolls.filter(r => r === 20).length
   
-  if (ones >= 2) return { type: 'spectacular', success: true, message: 'Spektakulärer Erfolg!' };
-  if (twenties >= 2) return { type: 'catastrophic', success: false, message: 'Spektakulärer Patzer!' };
-  if (ones === 1) return { type: 'critical', success: true, message: 'Kritischer Erfolg!' };
-  if (twenties === 1) return { type: 'fumble', success: false, message: 'Patzer!' };
-  return null;
+  if (ones >= 2) return { type: 'spectacular', success: true, message: 'Spektakulärer Erfolg!' }
+  if (twenties >= 2) return { type: 'catastrophic', success: false, message: 'Spektakulärer Patzer!' }
+  if (ones === 1) return { type: 'critical', success: true, message: 'Kritischer Erfolg!' }
+  if (twenties === 1) return { type: 'fumble', success: false, message: 'Patzer!' }
+  return null
 }
 
 const performCheck = async () => {
+  console.log('performCheck called')
   try {
-    if (checkType.value === 'attribute') {
+    if (currentCheckType.value === CHECK_TYPES.ATTRIBUTE) {
+      // Set view mode before rolling
+      diceRoller1.value.updateViewMode(false)
       const roll = await diceRoller1.value.rollDice('d20', 1)
       const attributeValue = characterStore.stats.attributes[selectedAttribute.value]
       
@@ -182,32 +85,33 @@ const performCheck = async () => {
         qualityLevel,
         critical: roll[0] === 1 ? 'Kritischer Erfolg!' : (roll[0] === 20 ? 'Patzer!' : null)
       }
-    } else {
-      const talent = talents.value.find(t => t.name === selectedTalent.value)
+    } else if (currentCheckType.value === CHECK_TYPES.TALENT) {
+      const talent = selectedTalentData.value
       if (!talent) return
 
+      // Set view mode before rolling
+      diceRoller1.value.updateViewMode(true)
       const rolls = await diceRoller1.value.rollDice('d20', 3)
       const flatRolls = rolls.flat()
-  
-  // Check for critical rolls first
-  const criticalResult = checkCriticalRolls(flatRolls)
-  
-  if (criticalResult) {
-    const pointsNeeded = criticalResult.success ? 0 : talent.value + 1 
-    const remainingPoints = criticalResult.success ? talent.value : -1
-    const qualityLevel = criticalResult.success ? calculateQS(remainingPoints) : 0
-    
-    result.value = {
-      type: 'talent',
-      talent: talent.name,
-      rolls,
-      pointsNeeded,
-      remainingPoints,
-      success: criticalResult.success,
-      qualityLevel,
-      critical: criticalResult.message
-    }
-  } else {
+      
+      const criticalResult = checkCriticalRolls(flatRolls)
+      
+      if (criticalResult) {
+        const pointsNeeded = criticalResult.success ? 0 : talent.value + 1 
+        const remainingPoints = criticalResult.success ? talent.value : -1
+        const qualityLevel = criticalResult.success ? calculateQS(remainingPoints) : 0
+        
+        result.value = {
+          type: 'talent',
+          talent: talent.name,
+          rolls: flatRolls,
+          pointsNeeded,
+          remainingPoints,
+          success: criticalResult.success,
+          qualityLevel,
+          critical: criticalResult.message
+        }
+      } else {
         let pointsNeeded = 0
         talent.attributes.forEach((attr, index) => {
           const attrValue = characterStore.stats.attributes[attr]
@@ -233,25 +137,107 @@ const performCheck = async () => {
     }
   } catch (error) {
     console.error('Error during check:', error)
-    console.error('Error stack:', error.stack)
   }
 }
-
-const formatResult = (res) => {
-  if (res.type === 'attribute') {
-    return `Würfelwurf: ${res.roll} gegen ${res.target} (${res.attribute}) - ${res.success ? 'Erfolg!' : 'Misserfolg!'}`
-  } else {
-    return `Würfe: ${res.rolls.join(', ')} - Benötigte Punkte: ${res.pointsNeeded} - ${res.success ? 'Erfolg!' : 'Misserfolg!'}`
-  }
-
-
-}
-
-onBeforeUpdate(() => {
-  diceRollers.value = []
-})
-
 </script>
+
+<template>
+  <div class="dice-check">
+    <h2>Würfelprobe</h2>
+    
+    <!-- Dice roller container -->
+    <div class="dice-rollers">
+      <div class="dice-views">
+        <div class="dice-wrapper">
+          <DiceRoller ref="diceRoller1" class="dice-roller" />
+          <!-- Single label for attribute check -->
+          <div v-if="currentCheckType === CHECK_TYPES.ATTRIBUTE" class="single-dice-label">
+            {{ selectedAttribute }} ({{ characterStore.stats.attributes[selectedAttribute] }})
+          </div>
+          <!-- Three labels for talent check -->
+          <div v-else-if="selectedTalentData" class="talent-dice-labels">
+            <div v-for="(attr, index) in selectedTalentData.attributes" 
+                 :key="index" 
+                 class="dice-label"
+                 :style="{ width: '300px' }">
+              {{ attr }} ({{ characterStore.stats.attributes[attr] }})
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Controls -->
+    <div class="controls">
+      <div class="check-type">
+        <button 
+          :class="{ active: currentCheckType === CHECK_TYPES.ATTRIBUTE }"
+          @click="currentCheckType = CHECK_TYPES.ATTRIBUTE"
+        >
+          Eigenschaftsprobe
+        </button>
+        <button 
+          :class="{ active: currentCheckType === CHECK_TYPES.TALENT }"
+          @click="currentCheckType = CHECK_TYPES.TALENT"
+        >
+          Talentprobe
+        </button>
+      </div>
+      
+      <div class="selection" v-if="currentCheckType === CHECK_TYPES.ATTRIBUTE">
+        <select v-model="selectedAttribute">
+          <option value="MU">Mut</option>
+          <option value="KL">Klugheit</option>
+          <option value="IN">Intuition</option>
+          <option value="CH">Charisma</option>
+          <option value="FF">Fingerfertigkeit</option>
+          <option value="GE">Gewandheit</option>
+          <option value="KO">Konstitution</option>
+          <option value="KK">Körperkraft</option>
+        </select>
+      </div>
+      
+      <div v-if="currentCheckType === CHECK_TYPES.TALENT" class="talent-selection">
+        <select v-model="selectedTalent">
+          <option v-for="talent in talents" :key="talent.name" :value="talent.name">
+            {{ talent.name }} ({{ talent.value }})
+          </option>
+        </select>
+        <div v-if="selectedTalentData" class="talent-info">
+          Talentwert: {{ selectedTalentData.value }}
+        </div>
+      </div>
+      
+      <div class="button-group">
+        <button class="roll-button" @click="performCheck">
+          Würfeln
+        </button>
+        <button 
+          v-if="currentCheckType === CHECK_TYPES.TALENT" 
+          class="camera-reset-button" 
+          @click="resetAllCameras"
+        >
+          📷🔃
+        </button>
+      </div>
+    </div>
+    
+    <!-- Result display -->
+    <div v-if="result" class="result" :class="{ 
+      success: result.success,
+      critical: result.critical && result.success,
+      fumble: result.critical && !result.success
+    }">
+      <div class="success-indicator">
+        {{ result.critical || (result.success ? 'Erfolg!' : 'Misserfolg!') }}
+      </div>
+      <div v-if="result.success" class="result-qs">QS {{ result.qualityLevel }}</div>
+      <div class="result-line">Würfe: {{ result.rolls.join(', ') }}</div>
+      <div class="result-line">Benötigte Punkte: {{ result.pointsNeeded }}</div>
+      <div v-if="result.success" class="result-line">Übrige Punkte: {{ result.remainingPoints }}</div>
+    </div>
+  </div>
+</template>
 
 <style scoped>
 .dice-check {
