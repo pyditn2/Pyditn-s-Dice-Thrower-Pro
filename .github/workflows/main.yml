@@ -4,14 +4,13 @@ on:
     branches:
       - main
 
-env:
-  BUILD_NUMBER: ${{ github.run_number }}
-
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-latest, windows-latest]
+        platform: [macos-latest, windows-latest]
+
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v3
@@ -19,38 +18,56 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: '16'
-          
+          node-version: '18'
+          cache: 'npm'
+      
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-          
-      - name: Install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-latest'
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      
+      # Force Rust to use static linking for Windows
+      - name: Set Windows environment
+        if: matrix.platform == 'windows-latest'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+          echo "RUSTFLAGS=-C target-feature=+crt-static" >> $GITHUB_ENV
+        shell: bash
 
-      - name: Install app dependencies
+      - name: Install dependencies
         run: npm install
         
-      # Add environment variables to ensure non-interactive mode
-      - name: Build Tauri app
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli
+        
+      # Build Vue.js app
+      - name: Build Frontend
+        run: npm run build
         env:
-          CI: true
-          GITHUB_ACTIONS: true
-          # Disable Windows defender scanning to prevent termination
-          CARGO_INCREMENTAL: 0
-          RUST_BACKTRACE: 1
-        shell: bash
-        run: npm run tauri build
+          NODE_ENV: production
           
-      - name: Upload artifacts
+      # Build Tauri app using cargo directly
+      - name: Build Tauri (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          cd src-tauri
+          cargo build --release
+        env:
+          RUST_BACKTRACE: 1
+          
+      - name: Build Tauri (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cd src-tauri
+          cargo build --release
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "10.13"
+          
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: PDTP-${{ matrix.platform }}-1.0.0-build.${{ env.BUILD_NUMBER }}
+          name: PDTP-${{ matrix.platform }}
           path: |
-            src-tauri/target/release/*.exe
-            src-tauri/target/release/*.dmg
-            src-tauri/target/release/*.app
-            src-tauri/target/release/bundle/deb/*
-            src-tauri/target/release/bundle/appimage/*
+            src-tauri/target/release/pdtp.exe
+            src-tauri/target/release/bundle/macos/PDTP.app
