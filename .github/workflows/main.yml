@@ -38,31 +38,18 @@ jobs:
       - name: Install dependencies
         run: npm install
         
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli
-        
       # Build Vue.js app
       - name: Build Frontend
         run: npm run build
         env:
           NODE_ENV: production
           
-      # Build Tauri app using cargo directly
-      - name: Build Tauri (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          cd src-tauri
-          cargo build --release
+      # Build Tauri app using local CLI
+      - name: Build Tauri App
+        run: npm run tauri build
         env:
           RUST_BACKTRACE: 1
-          
-      - name: Build Tauri (macOS)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          cd src-tauri
-          cargo build --release
-        env:
-          MACOSX_DEPLOYMENT_TARGET: "10.13"
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.platform == 'macos-latest' && '10.13' || '' }}
           
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
