@@ -14,6 +14,8 @@ const result = ref(null)
 const diceRollers = ref([])
 const currentCheckType = ref(CHECK_TYPES.ATTRIBUTE)
 
+const modifier = ref(0)
+
 // Get talents from store
 const talents = computed(() => {
   const allTalents = []
@@ -69,9 +71,10 @@ const performCheck = async () => {
       diceRoller1.value.updateViewMode(false)
       const roll = await diceRoller1.value.rollDice('d20', 1)
       const attributeValue = characterStore.stats.attributes[selectedAttribute.value]
+      const adjustedAttributeValue = attributeValue + modifier.value
       
-      const success = roll[0] === 1 || (roll[0] <= attributeValue && roll[0] !== 20)
-      const remainingPoints = success ? attributeValue - roll[0] : 0
+      const success = roll[0] === 1 || (roll[0] <= adjustedAttributeValue && roll[0] !== 20)
+      const remainingPoints = success ? adjustedAttributeValue - roll[0] : 0
       const qualityLevel = success ? calculateQS(remainingPoints) : 0
       
       result.value = {
@@ -80,6 +83,8 @@ const performCheck = async () => {
         rolls: [roll[0]],
         roll: roll[0],
         target: attributeValue,
+        adjustedTarget: adjustedAttributeValue,
+        modifier: modifier.value,
         success,
         remainingPoints,
         qualityLevel,
@@ -109,14 +114,20 @@ const performCheck = async () => {
           remainingPoints,
           success: criticalResult.success,
           qualityLevel,
-          critical: criticalResult.message
+          critical: criticalResult.message,
+          modifier: modifier.value
         }
       } else {
         let pointsNeeded = 0
-        talent.attributes.forEach((attr, index) => {
-          const attrValue = characterStore.stats.attributes[attr]
-          if (flatRolls[index] > attrValue) {
-            pointsNeeded += flatRolls[index] - attrValue
+        const adjustedAttributes = talent.attributes.map(attr => ({
+          name: attr,
+          value: characterStore.stats.attributes[attr],
+          adjustedValue: characterStore.stats.attributes[attr] + modifier.value
+        }))
+        
+        adjustedAttributes.forEach((attr, index) => {
+          if (flatRolls[index] > attr.adjustedValue) {
+            pointsNeeded += flatRolls[index] - attr.adjustedValue
           }
         })
         
@@ -131,7 +142,9 @@ const performCheck = async () => {
           pointsNeeded,
           remainingPoints,
           success,
-          qualityLevel
+          qualityLevel,
+          adjustedAttributes,
+          modifier: modifier.value
         }
       }
     }
@@ -208,6 +221,11 @@ const performCheck = async () => {
         </div>
       </div>
       
+      <div class="modifier">
+        <label for="modifier">Erleichterung/Erschwernis:</label>
+        <input id="modifier" type="number" v-model.number="modifier" />
+      </div>
+      
       <div class="button-group">
         <button class="roll-button" @click="performCheck">
           Würfeln
@@ -235,6 +253,15 @@ const performCheck = async () => {
       <div class="result-line">Würfe: {{ result.rolls.join(', ') }}</div>
       <div class="result-line">Benötigte Punkte: {{ result.pointsNeeded }}</div>
       <div v-if="result.success" class="result-line">Übrige Punkte: {{ result.remainingPoints }}</div>
+      <div class="result-line">Modifikator: {{ result.modifier }}</div>
+      <div v-if="result.type === 'attribute'" class="result-line">
+        Zielwert: {{ result.target }} (Angepasst: {{ result.adjustedTarget }})
+      </div>
+      <div v-if="result.type === 'talent'" class="result-line">
+        <div v-for="attr in result.adjustedAttributes" :key="attr.name">
+          {{ attr.name }}: {{ attr.value }} (Angepasst: {{ attr.adjustedValue }})
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -256,6 +283,21 @@ const performCheck = async () => {
   justify-content: center;
   width: 100%;
   max-width: 1000px;
+}
+
+.modifier {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modifier input {
+  width: 60px;
+  padding: 0.5rem;
+  background: #333;
+  color: white;
+  border: 1px solid #444;
+  border-radius: 4px;
 }
 
 .dice-views {
