@@ -1,34 +1,48 @@
-name: Build Tauri App
-
+name: Build PDTP
 on:
   push:
     branches:
       - main
 
+env:
+  BUILD_NUMBER: ${{ github.run_number }}
+
 jobs:
   build:
-    runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Node.js
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: '16'
+          
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+          
+      - name: Install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Install dependencies
+      - name: Install app dependencies
         run: npm install
-
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+          
+      - name: Build Tauri app
+        run: npm run tauri build
+          
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
         with:
-          toolchain: stable
-          override: true
-
-      - name: Install Tauri CLI
-        run: npm install -g @tauri-apps/cli
-
-      - name: Build Tauri App
-        run: npm run build
+          name: PDTP-${{ matrix.platform }}-1.0.0-build.${{ env.BUILD_NUMBER }}
+          path: |
+            src-tauri/target/release/*.exe
+            src-tauri/target/release/*.dmg
+            src-tauri/target/release/*.app
+            src-tauri/target/release/bundle/deb/*
+            src-tauri/target/release/bundle/appimage/*
