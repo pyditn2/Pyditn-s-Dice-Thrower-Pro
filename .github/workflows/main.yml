@@ -32,8 +32,16 @@ jobs:
 
       - name: Install app dependencies
         run: npm install
-          
+        
+      # Add environment variables to ensure non-interactive mode
       - name: Build Tauri app
+        env:
+          CI: true
+          GITHUB_ACTIONS: true
+          # Disable Windows defender scanning to prevent termination
+          CARGO_INCREMENTAL: 0
+          RUST_BACKTRACE: 1
+        shell: bash
         run: npm run tauri build
           
       - name: Upload artifacts
