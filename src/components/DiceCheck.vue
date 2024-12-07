@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useCharacterStore } from '../stores/characterStore'
 import { useDiceRollerStore } from '../stores/diceRollerStore'
 import DiceRoller from './DiceRoller.vue'
+import CharacterSelector from './CharacterSelector.vue'
 import { CHECK_TYPES, DICE_TYPES } from '../constants/diceTypes'
 
 const characterStore = useCharacterStore()
@@ -164,24 +165,8 @@ const performCheck = async () => {
 
 <template>
   <div class="dice-check">
-    <!-- Character Selection Bar -->
-    <div class="character-selection-bar">
-      <select 
-        v-model="characterStore.activeCharacterId"
-        @change="characterStore.setActiveCharacter($event.target.value)"
-        class="character-select"
-      >
-        <option value="">Charakter auswählen</option>
-        <option 
-          v-for="char in characterStore.characterList" 
-          :key="char.id" 
-          :value="char.id"
-        >
-          {{ char.name || 'Unbenannter Charakter' }}
-        </option>
-      </select>
-    </div>
-
+    <CharacterSelector />
+    
     <div v-if="characterStore.activeCharacter">
       <h2>Würfelprobe</h2>
       
@@ -206,6 +191,7 @@ const performCheck = async () => {
           </div>
         </div>
       </div>
+      
       
       <!-- Controls -->
       <div class="controls">
@@ -291,11 +277,11 @@ const performCheck = async () => {
         </div>
       </div>
     </div>
-
-    <div v-else class="no-character-selected">
+        <div v-else class="no-character-selected">
       <p>Bitte wählen Sie einen Charakter aus um Würfelproben durchzuführen.</p>
     </div>
   </div>
+ 
 </template>
 
 <style scoped>

@@ -129,9 +129,11 @@ export const useCharacterStore = defineStore('character', {
 
   actions: {
     initializeStore() {
-      // Check if there's existing character data in the old format
+      // Check if there's existing data in the old format
       const existingData = JSON.parse(localStorage.getItem('character'))
-      if (existingData && !this.characters[0]) {
+      
+      // Only initialize if characters object is empty
+      if (existingData && Object.keys(this.characters).length === 0) {
         // Create first character from existing data
         const firstCharId = '1'
         this.characters[firstCharId] = {
@@ -139,7 +141,11 @@ export const useCharacterStore = defineStore('character', {
           stats: existingData.stats || {},
           talents: existingData.talents || {}
         }
-        this.activeCharacterId = firstCharId
+        
+        // Only set activeCharacterId if none is currently selected
+        if (!this.activeCharacterId) {
+          this.activeCharacterId = firstCharId
+        }
       }
     },
 
@@ -243,7 +249,9 @@ export const useCharacterStore = defineStore('character', {
 
     deleteCharacter(id) {
       if (this.activeCharacterId === id) {
-        this.activeCharacterId = null
+        // If deleting the active character, try to select another one
+        const remainingIds = Object.keys(this.characters).filter(key => key !== id)
+        this.activeCharacterId = remainingIds.length > 0 ? remainingIds[0] : null
       }
       delete this.characters[id]
     },

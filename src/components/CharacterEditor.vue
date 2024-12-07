@@ -1,12 +1,16 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useCharacterStore } from '../stores/characterStore'
+import CharacterSelector from './CharacterSelector.vue'
 
 const characterStore = useCharacterStore()
 
 // Initialize store on component mount
 onMounted(() => {
-  characterStore.initializeStore()
+  // Only initialize if there are no characters yet
+  if (Object.keys(characterStore.characters).length === 0) {
+    characterStore.initializeStore()
+  }
 })
 
 // Attribute names mapping
@@ -63,30 +67,7 @@ const deleteCurrentCharacter = () => {
 
 <template>
   <div class="character-editor">
-    <!-- Character Selection Bar -->
-    <div class="character-selection-bar">
-      <select 
-        v-model="characterStore.activeCharacterId"
-        @change="characterStore.setActiveCharacter($event.target.value)"
-      >
-        <option value="">Charakter Auswählen</option>
-        <option 
-          v-for="char in characterStore.characterList" 
-          :key="char.id" 
-          :value="char.id"
-        >
-          {{ char.name || 'Unnamed Character' }}
-        </option>
-      </select>
-      <button @click="createNewCharacter" class="create-btn">Neuer Charakter</button>
-      <button 
-        @click="deleteCurrentCharacter"
-        :disabled="!characterStore.activeCharacterId"
-        class="delete-btn"
-      >
-        Charakter Löschen
-      </button>
-    </div>
+    <CharacterSelector />
 
     <div v-if="characterStore.activeCharacter" class="editor-layout">
       <!-- Character Info Sidebar -->
@@ -196,51 +177,6 @@ const deleteCurrentCharacter = () => {
 </template>
 
 <style scoped>
-.character-selection-bar {
-  margin-bottom: 1rem;
-  padding: 1rem;
-  background: #1a1a1a;
-  border-radius: 8px;
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-.character-selection-bar select {
-  padding: 0.5rem;
-  background: #333;
-  border: 1px solid #444;
-  color: white;
-  border-radius: 4px;
-  min-width: 200px;
-}
-
-.character-selection-bar button {
-  padding: 0.5rem 1rem;
-  background: #42b983;
-  border: none;
-  border-radius: 4px;
-  color: white;
-  cursor: pointer;
-}
-
-.character-selection-bar button:disabled {
-  background: #666;
-  cursor: not-allowed;
-}
-
-.character-selection-bar button:hover:not(:disabled) {
-  background: #3aa876;
-}
-
-.no-character-selected {
-  text-align: center;
-  padding: 2rem;
-  background: #1a1a1a;
-  border-radius: 8px;
-  color: #999;
-}
-
 .character-editor {
   padding: 1rem;
   color: white;
@@ -270,29 +206,6 @@ const deleteCurrentCharacter = () => {
   width: 250px;
 }
 
-.info-field input {
-  width: 250px; 
-  padding: 0.5rem;
-  background: #333;
-  border: 1px solid #444;
-  color: white;
-  border-radius: 4px;
-}
-
-.main-content {
-  flex-grow: 1;
-}
-
-.info-section {
-  background: #1a1a1a;
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.info-field {
-  margin-bottom: 1rem;
-}
-
 .info-field label {
   display: block;
   margin-bottom: 0.5rem;
@@ -300,7 +213,7 @@ const deleteCurrentCharacter = () => {
 }
 
 .info-field input {
-  width: 100%;
+  width: 250px; 
   padding: 0.5rem;
   background: #333;
   border: 1px solid #444;
@@ -311,6 +224,10 @@ const deleteCurrentCharacter = () => {
 .info-field input:focus {
   outline: none;
   border-color: #42b983;
+}
+
+.main-content {
+  flex-grow: 1;
 }
 
 .section {
@@ -397,12 +314,32 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
+.no-character-selected {
+  text-align: center;
+  padding: 2rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  color: #999;
+}
+
 @media (max-width: 1024px) {
   .editor-layout {
     flex-direction: column;
   }
   
   .character-info-sidebar {
+    width: 100%;
+  }
+
+  .info-section {
+    width: 100%;
+  }
+
+  .info-field {
+    width: 100%;
+  }
+
+  .info-field input {
     width: 100%;
   }
 }
