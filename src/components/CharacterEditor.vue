@@ -1,8 +1,13 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useCharacterStore } from '../stores/characterStore'
 
 const characterStore = useCharacterStore()
+
+// Initialize store on component mount
+onMounted(() => {
+  characterStore.initializeStore()
+})
 
 // Attribute names mapping
 const attributeNames = {
@@ -25,31 +30,65 @@ const categoryNames = {
   handwerkstalente: 'Handwerkstalente'
 }
 
-// Helper function to update attribute value
+// Helper functions
 const updateAttribute = (key, value) => {
   const numValue = parseInt(value)
   if (!isNaN(numValue)) {
-    characterStore.stats.attributes[key] = numValue
+    characterStore.updateAttribute(key, numValue)
   }
 }
 
-// Helper function to update talent value
 const updateTalent = (categoryKey, talentIndex, value) => {
   const numValue = parseInt(value)
   if (!isNaN(numValue)) {
-    characterStore.talents[categoryKey][talentIndex].value = numValue
+    const talent = characterStore.activeCharacter.talents[categoryKey][talentIndex]
+    characterStore.updateTalentValue(talent.name, numValue)
   }
 }
 
-// Character info update functions
 const updateCharacterInfo = (field, value) => {
-  characterStore.characterInfo[field] = value
+  characterStore.updateCharacterInfo(field, value)
+}
+
+const createNewCharacter = () => {
+  characterStore.createCharacter()
+}
+
+const deleteCurrentCharacter = () => {
+  if (characterStore.activeCharacterId && confirm('Sind Sie sicher, dass Sie diesen Charakter löschen möchten?')) {
+    characterStore.deleteCharacter(characterStore.activeCharacterId)
+  }
 }
 </script>
 
 <template>
   <div class="character-editor">
-    <div class="editor-layout">
+    <!-- Character Selection Bar -->
+    <div class="character-selection-bar">
+      <select 
+        v-model="characterStore.activeCharacterId"
+        @change="characterStore.setActiveCharacter($event.target.value)"
+      >
+        <option value="">Charakter Auswählen</option>
+        <option 
+          v-for="char in characterStore.characterList" 
+          :key="char.id" 
+          :value="char.id"
+        >
+          {{ char.name || 'Unnamed Character' }}
+        </option>
+      </select>
+      <button @click="createNewCharacter" class="create-btn">Neuer Charakter</button>
+      <button 
+        @click="deleteCurrentCharacter"
+        :disabled="!characterStore.activeCharacterId"
+        class="delete-btn"
+      >
+        Charakter Löschen
+      </button>
+    </div>
+
+    <div v-if="characterStore.activeCharacter" class="editor-layout">
       <!-- Character Info Sidebar -->
       <div class="character-info-sidebar">
         <div class="info-section">
@@ -59,7 +98,7 @@ const updateCharacterInfo = (field, value) => {
             <input 
               id="char-name"
               type="text" 
-              :value="characterStore.characterInfo.name"
+              :value="characterStore.activeCharacter.characterInfo.name"
               @input="e => updateCharacterInfo('name', e.target.value)"
               placeholder="Charaktername"
             >
@@ -69,7 +108,7 @@ const updateCharacterInfo = (field, value) => {
             <input 
               id="char-species"
               type="text" 
-              :value="characterStore.characterInfo.spezies"
+              :value="characterStore.activeCharacter.characterInfo.spezies"
               @input="e => updateCharacterInfo('spezies', e.target.value)"
               placeholder="Spezies"
             >
@@ -79,7 +118,7 @@ const updateCharacterInfo = (field, value) => {
             <input 
               id="char-culture"
               type="text" 
-              :value="characterStore.characterInfo.kultur"
+              :value="characterStore.activeCharacter.characterInfo.kultur"
               @input="e => updateCharacterInfo('kultur', e.target.value)"
               placeholder="Kultur"
             >
@@ -89,7 +128,7 @@ const updateCharacterInfo = (field, value) => {
             <input 
               id="char-profession"
               type="text" 
-              :value="characterStore.characterInfo.profession"
+              :value="characterStore.activeCharacter.characterInfo.profession"
               @input="e => updateCharacterInfo('profession', e.target.value)"
               placeholder="Profession"
             >
@@ -103,7 +142,7 @@ const updateCharacterInfo = (field, value) => {
         <div class="section">
           <h3>Eigenschaften</h3>
           <div class="attributes-grid">
-            <div v-for="(value, key) in characterStore.stats.attributes" 
+            <div v-for="(value, key) in characterStore.activeCharacter.stats.attributes" 
                  :key="key" 
                  class="attribute-item">
               <label :for="key">{{ attributeNames[key] }}</label>
@@ -122,7 +161,7 @@ const updateCharacterInfo = (field, value) => {
         <!-- Talents Section -->
         <div class="section">
           <h3>Talente</h3>
-          <div v-for="(talents, categoryKey) in characterStore.talents" 
+          <div v-for="(talents, categoryKey) in characterStore.activeCharacter.talents" 
                :key="categoryKey" 
                class="talent-category">
             <h4>{{ categoryNames[categoryKey] }}</h4>
@@ -149,10 +188,59 @@ const updateCharacterInfo = (field, value) => {
         </div>
       </div>
     </div>
+    
+    <div v-else class="no-character-selected">
+      <p>Charakter auswählen oder erstellen</p>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.character-selection-bar {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.character-selection-bar select {
+  padding: 0.5rem;
+  background: #333;
+  border: 1px solid #444;
+  color: white;
+  border-radius: 4px;
+  min-width: 200px;
+}
+
+.character-selection-bar button {
+  padding: 0.5rem 1rem;
+  background: #42b983;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+}
+
+.character-selection-bar button:disabled {
+  background: #666;
+  cursor: not-allowed;
+}
+
+.character-selection-bar button:hover:not(:disabled) {
+  background: #3aa876;
+}
+
+.no-character-selected {
+  text-align: center;
+  padding: 2rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  color: #999;
+}
+
 .character-editor {
   padding: 1rem;
   color: white;
