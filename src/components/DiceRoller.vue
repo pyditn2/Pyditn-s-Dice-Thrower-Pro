@@ -32,7 +32,7 @@ let lastSettleTime = null
 const SETTLE_DISPLAY_DURATION = 5000 // 5 seconds in milliseconds
 const isRotating = ref(true)
 
-const FIXED_TIME_STEP = 1/60
+const FIXED_TIME_STEP = 1/120
 const GRAVITY = -25  // Increased from -9.81 for faster falls
 const INITIAL_THROW_SPEED = 15  // Increased from 5 for more energetic throws
 const INITIAL_SPIN_SPEED = 20   // Increased from 10 for more rotation
