@@ -357,6 +357,11 @@ const createDiceInstance = (type, index, count) => {
 }
 
 const resetCamera = () => {
+  // Reset rotation and animation state
+  rotationAngle = 0
+  isRotating.value = true
+  
+  // Reset camera positions
   cameras.forEach((camera, index) => {
     const defaultPositions = [
       new THREE.Vector3(0, 8, 12),    // Main view
@@ -366,6 +371,14 @@ const resetCamera = () => {
     camera.position.copy(defaultPositions[index]);
     camera.lookAt(0, 0, 0);
   });
+
+  // Reset camera manager if it exists
+  if (cameraManager) {
+    cameraManager.reset();
+    for (let i = 0; i < 3; i++) {
+      cameraManager.setMode('overview', i);
+    }
+  }
 }
 
 const rollDice = async (type, count) => {

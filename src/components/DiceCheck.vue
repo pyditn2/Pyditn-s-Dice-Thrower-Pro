@@ -80,11 +80,10 @@ const selectFirstFilteredTalent = () => {
 }
 
 const resetAllCameras = () => {
-  if (currentCheckType.value === CHECK_TYPES.ATTRIBUTE) {
+  diceRoller1.value?.updateViewMode(true)
+  setTimeout(() => { 
     diceRoller1.value?.resetCamera()
-  } else {
-    diceRollers.forEach(roller => roller?.resetCamera())
-  }
+  }, 0)
 }
 
 const calculateQS = (remainingPoints) => {
@@ -317,7 +316,7 @@ onUnmounted(() => {
             class="camera-reset-button" 
             @click="resetAllCameras"
           >
-            📷🔃
+            🎲
           </button>
         </div>
       </div>
