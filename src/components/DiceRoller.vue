@@ -29,14 +29,10 @@ let accumulator = 0
 let rotationAngle = 0
 const ROTATION_SPEED = 0.003
 let lastSettleTime = null
-const SETTLE_DISPLAY_DURATION = 5000 // 5 seconds in milliseconds
 const isRotating = ref(true)
 
 const FIXED_TIME_STEP = 1/120
-const GRAVITY = -25  // Increased from -9.81 for faster falls
-const INITIAL_THROW_SPEED = 15  // Increased from 5 for more energetic throws
-const INITIAL_SPIN_SPEED = 20   // Increased from 10 for more rotation
-const DICE_SIZE = 0.02  // Kept the same for consistent scale
+const GRAVITY = -25  
 
 let previousState = new Map()
 let currentState = new Map()
@@ -45,6 +41,7 @@ const setupMainLight = () => {
   const mainLight = new THREE.DirectionalLight(0xffffff, 1)
   mainLight.position.set(5, 10, 5)
   mainLight.castShadow = true
+
   // Configure shadow properties
   mainLight.shadow.mapSize.width = 1024
   mainLight.shadow.mapSize.height = 1024
@@ -56,9 +53,9 @@ const setupMainLight = () => {
   mainLight.shadow.camera.bottom = -10
   
   // Add these shadow bias settings
-  mainLight.shadow.bias = -0.001        // Reduce shadow acne
-  mainLight.shadow.normalBias = 0.02    // Improve contact shadows
-  mainLight.shadow.radius = 1.5         // Soften shadow edges slightly
+  mainLight.shadow.bias = -0.001    
+  mainLight.shadow.normalBias = 0.02   
+  mainLight.shadow.radius = 1.5         
   
   return mainLight
 }
@@ -103,7 +100,6 @@ const updateDicePhysics = () => {
     if (!rigidBody) return
     // If die is already settled, skip physics calculations
     if (settledDice.value.has(index)) {
-      // Ensure camera is in correct mode for settled dice
       if (cameraManager) {
         cameraManager.setMode('topdown', index)
       }
@@ -339,15 +335,15 @@ const createDiceInstance = (type, index, count) => {
 
     // Higher initial velocities for more dynamic movement
     const linvel = new RAPIER.Vector3(
-      Math.random() * 20 - 10,  // Increased range of horizontal velocity
-      15,                       // Higher upward throw
-      Math.random() * 20 - 10   // Increased range of forward/backward velocity
+      Math.random() * 20 - 10,  
+      15,                       
+      Math.random() * 20 - 10 
     )
     rigidBody.setLinvel(linvel)
 
     // Higher angular velocities for more spinning
     const angvel = new RAPIER.Vector3(
-      Math.random() * 30 - 15,  // Increased rotation speeds
+      Math.random() * 30 - 15,  
       Math.random() * 30 - 15,
       Math.random() * 30 - 15
     )
