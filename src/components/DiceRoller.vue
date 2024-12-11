@@ -22,7 +22,7 @@ let rigidBodies = []
 let animationFrameId = null
 const diceManager = new DiceManager()
 
-const MAX_SUBSTEPS = 3 
+const MAX_SUBSTEPS = 3
 let lastTime = 0
 let accumulator = 0
 
@@ -36,6 +36,9 @@ const GRAVITY = -25
 
 let previousState = new Map()
 let currentState = new Map()
+
+const showWireframes = ref(false)
+const wireframeHelpers = ref([])
 
 const setupMainLight = () => {
   const mainLight = new THREE.DirectionalLight(0xffffff, 1)
@@ -154,70 +157,201 @@ const updateDicePhysics = () => {
   }
 }
 
+const toggleWireframes = () => {
+  showWireframes.value = !showWireframes.value
+  wireframeHelpers.value.forEach(helper => {
+    helper.visible = showWireframes.value
+  })
+}
+
 const createGround = () => {
-  // Base ground
-  const groundGeometry = new THREE.PlaneGeometry(20, 20)
+  createHexagonalGround()
+}
+
+const createHexagonalGround = () => {
+  // Hexagon parameters
+  const radius = 10        
+  const topRadius = 11     
+  const height = 4         
+  const wallThickness = 0.5
+  wireframeHelpers.value = []
+  
+  // Create base and top vertices
+  const baseVertices = []
+  const topVertices = []
+  
+  for (let i = 0; i < 6; i++) {
+    const angle = (i * Math.PI) / 3
+    baseVertices.push([
+      radius * Math.cos(angle),
+      radius * Math.sin(angle)
+    ])
+    topVertices.push([
+      topRadius * Math.cos(angle),
+      topRadius * Math.sin(angle)
+    ])
+  }
+
+  // Create vertices for trimesh (triangulated hexagon)
+  const vertices = []
+  const indices = []
+  
+  // Center point
+  vertices.push(0, 0, 0)
+  
+  // Add outer vertices
+  for (let i = 0; i < 6; i++) {
+    vertices.push(baseVertices[i][0], 0, baseVertices[i][1])
+  }
+  
+  // Create triangles (fan triangulation from center)
+  for (let i = 0; i < 6; i++) {
+    indices.push(
+      0,                    // center point
+      i + 1,               // current outer vertex
+      ((i + 1) % 6) + 1    // next outer vertex
+    )
+  }
+
+  // Create ground collider using trimesh
+  const groundColliderDesc = RAPIER.ColliderDesc.trimesh(
+    new Float32Array(vertices),
+    new Uint32Array(indices)
+  )
+  
+  groundColliderDesc
+    .setRestitution(0.1)
+    .setFriction(1.0)
+
+  // Create physics bodies
+  const groundRigidBodyDesc = RAPIER.RigidBodyDesc.fixed()
+  const groundRigidBody = world.createRigidBody(groundRigidBodyDesc)
+  world.createCollider(groundColliderDesc, groundRigidBody)
+
+  // Create visual ground mesh
+  const groundShape = new THREE.Shape()
+  groundShape.moveTo(baseVertices[0][0], baseVertices[0][1])
+  for (let i = 1; i < 6; i++) {
+    groundShape.lineTo(baseVertices[i][0], baseVertices[i][1])
+  }
+  groundShape.lineTo(baseVertices[0][0], baseVertices[0][1])
+
+  const groundGeometry = new THREE.ShapeGeometry(groundShape)
   const groundMaterial = new THREE.MeshPhongMaterial({ 
     color: 0x222222,
     side: THREE.DoubleSide
   })
   const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial)
-  groundMesh.rotation.x = Math.PI / 2
+  groundMesh.rotation.x = -Math.PI / 2
   groundMesh.position.y = -0.001
   groundMesh.receiveShadow = true
   scene.add(groundMesh)
 
-  // Create walls
-  const wallHeight = 4;
-  const walls = [
-    { pos: [10, wallHeight/2, 0], scale: [0.5, wallHeight, 20], rot: [0, 0, 0] },    // Right wall
-    { pos: [-10, wallHeight/2, 0], scale: [0.5, wallHeight, 20], rot: [0, 0, 0] },   // Left wall
-    { pos: [0, wallHeight/2, 10], scale: [20, wallHeight, 0.5], rot: [0, 0, 0] },    // Back wall
-    { pos: [0, wallHeight/2, -10], scale: [20, wallHeight, 0.5], rot: [0, 0, 0] },   // Front wall
-  ];
-
-  walls.forEach(wall => {
-    const wallGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const wallMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
-    const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
-    
-    wallMesh.position.set(...wall.pos);
-    wallMesh.scale.set(...wall.scale);
-    wallMesh.rotation.set(...wall.rot);
-    wallMesh.receiveShadow = true
-    
-    scene.add(wallMesh);
-  });
-
-  // Physics bodies
-  const groundRigidBodyDesc = RAPIER.RigidBodyDesc.fixed();
-  const groundRigidBody = world.createRigidBody(groundRigidBodyDesc);
+  // Add visible helper for ground collider
+  const helperGeometry = new THREE.BufferGeometry()
+  helperGeometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+  helperGeometry.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1))
   
-  // Ground collider
-  const groundColliderDesc = RAPIER.ColliderDesc.cuboid(10.0, 0.5, 10.0);
-  groundColliderDesc
-    .setRestitution(0.8)   
-    .setFriction(0.8);
-  world.createCollider(groundColliderDesc, groundRigidBody);
+  const helperMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff0000,
+    wireframe: true,
+    side: THREE.DoubleSide
+  })
+  const groundHelper = new THREE.Mesh(helperGeometry, helperMaterial)
+  groundHelper.visible = showWireframes.value
+  scene.add(groundHelper)
+  wireframeHelpers.value.push(groundHelper)
 
-  // Wall colliders
-  const wallColliders = [
-    { pos: [10, wallHeight/2, 0], half: [0.25, wallHeight/2, 10] },    // Right wall
-    { pos: [-10, wallHeight/2, 0], half: [0.25, wallHeight/2, 10] },   // Left wall
-    { pos: [0, wallHeight/2, 10], half: [10, wallHeight/2, 0.25] },    // Back wall
-    { pos: [0, wallHeight/2, -10], half: [10, wallHeight/2, 0.25] },   // Front wall
-  ];
+  // Create walls
+  for (let i = 0; i < 6; i++) {
+    const nextI = (i + 1) % 6
+    
+    // Get vertices for current wall segment
+    const baseStart = baseVertices[i]
+    const baseEnd = baseVertices[nextI]
+    const topStart = topVertices[i]
+    const topEnd = topVertices[nextI]
+    
+    // Create wall geometry using both sets of vertices
+    const wallVertices = new Float32Array([
+      // Base vertices
+      baseStart[0], 0, baseStart[1],           // bottom left
+      baseEnd[0], 0, baseEnd[1],               // bottom right
+      // Top vertices
+      topStart[0], height, topStart[1],        // top left
+      topEnd[0], height, topEnd[1]             // top right
+    ])
+    
+    // Create triangles
+    const indices = new Uint16Array([
+      0, 1, 2,  // first triangle
+      1, 3, 2   // second triangle
+    ])
+    
+    const wallGeometry = new THREE.BufferGeometry()
+    wallGeometry.setAttribute('position', new THREE.BufferAttribute(wallVertices, 3))
+    wallGeometry.setIndex(new THREE.BufferAttribute(indices, 1))
+    wallGeometry.computeVertexNormals()
+    
+    const wallMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0x333333,
+      transparent: true,
+      opacity: 0.8,
+      side: THREE.DoubleSide
+    })
+    
+    const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial)
+    wallMesh.receiveShadow = true
+    wallMesh.castShadow = true
+    scene.add(wallMesh)
+    
+    // Create wall collider using convex hull from vertices
+    const wallColliderPoints = new Float32Array([
+      // Front face points
+      baseStart[0], 0, baseStart[1],
+      baseEnd[0], 0, baseEnd[1],
+      topStart[0], height, topStart[1],
+      topEnd[0], height, topEnd[1],
+      // Back face points (offset by thickness)
+      baseStart[0], 0, baseStart[1] + wallThickness,
+      baseEnd[0], 0, baseEnd[1] + wallThickness,
+      topStart[0], height, topStart[1] + wallThickness,
+      topEnd[0], height, topEnd[1] + wallThickness
+    ])
+    
+    const wallColliderDesc = RAPIER.ColliderDesc.convexHull(wallColliderPoints)
+    wallColliderDesc
+      .setRestitution(0.5)
+      .setFriction(0.2)
+    
+    world.createCollider(wallColliderDesc, groundRigidBody)
 
-  wallColliders.forEach(wall => {
-  const wallColliderDesc = RAPIER.ColliderDesc.cuboid(...wall.half);
-  wallColliderDesc.translation = new RAPIER.Vector3(...wall.pos);
-  wallColliderDesc
-    .setRestitution(1)
-    .setFriction(0.2);
-  world.createCollider(wallColliderDesc, groundRigidBody);
-});
-};
-
+    // Add visible helper for wall collider
+    const wallHelperGeometry = new THREE.BufferGeometry()
+    wallHelperGeometry.setAttribute('position', new THREE.BufferAttribute(wallColliderPoints, 3))
+    
+    // Create edges for wireframe visualization
+    const indices2 = new Uint16Array([
+      // Front face
+      0, 1, 1, 3, 3, 2, 2, 0,
+      // Back face
+      4, 5, 5, 7, 7, 6, 6, 4,
+      // Connecting edges
+      0, 4, 1, 5, 2, 6, 3, 7
+    ])
+    
+    wallHelperGeometry.setIndex(new THREE.BufferAttribute(indices2, 1))
+    
+    const wallHelperMaterial = new THREE.LineBasicMaterial({
+      color: 0x00ff00
+    })
+    
+    const wallHelper = new THREE.LineSegments(wallHelperGeometry, wallHelperMaterial)
+  wallHelper.visible = showWireframes.value
+  scene.add(wallHelper)
+  wireframeHelpers.value.push(wallHelper)
+  }
+}
 
 
 const initScene = () => {
@@ -528,6 +662,13 @@ onMounted(async () => {
     lastTime = 0
     accumulator = 0
     animate(0)
+
+    // Add keyboard event listener
+    window.addEventListener('keydown', (event) => {
+      if (event.key.toLowerCase() === 'w') {
+        toggleWireframes()
+      }
+    })
   } catch (error) {
     console.error('Error in mounted hook:', error)
   }
@@ -537,6 +678,12 @@ onBeforeUnmount(() => {
   if (animationFrameId) {
     cancelAnimationFrame(animationFrameId)
   }
+  // Remove keyboard event listener
+  window.removeEventListener('keydown', (event) => {
+    if (event.key.toLowerCase() === 'w') {
+      toggleWireframes()
+    }
+  })
 })
 
 defineExpose({ 
