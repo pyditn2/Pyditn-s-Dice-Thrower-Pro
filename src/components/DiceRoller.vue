@@ -63,6 +63,42 @@ const setupMainLight = () => {
   return mainLight
 }
 
+const createFeltMaterial = () => {
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  canvas.width = 256
+  canvas.height = 256
+
+  // Fill with base color
+  ctx.fillStyle = '#0B5D1E' // Dark green base
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  // Add noise for felt texture
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const data = imageData.data
+
+  for (let i = 0; i < data.length; i += 4) {
+    const noise = Math.random() * 15 - 7.5
+    data[i] = Math.max(0, Math.min(255, data[i] + noise))     // R
+    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise)) // G
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise)) // B
+  }
+
+  ctx.putImageData(imageData, 0, 0)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.repeat.set(2, 2)
+
+  return new THREE.MeshStandardMaterial({
+    map: texture,
+    roughness: 0.9,
+    metalness: 0.1,
+    side: THREE.DoubleSide
+  })
+}
+
 watch(showExtraViews, (newValue) => {
   if (newValue) {
     // Small delay to ensure DOM is updated
@@ -174,7 +210,10 @@ const createHexagonalGround = () => {
   const topRadius = 11     
   const height = 4         
   const wallThickness = 0.5
+  
   wireframeHelpers.value = []
+
+  const feltMaterial = createFeltMaterial()
   
   // Create base and top vertices
   const baseVertices = []
@@ -241,7 +280,7 @@ const createHexagonalGround = () => {
     color: 0x222222,
     side: THREE.DoubleSide
   })
-  const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial)
+  const groundMesh = new THREE.Mesh(groundGeometry, feltMaterial)
   groundMesh.rotation.x = -Math.PI / 2
   groundMesh.position.y = -0.001
   groundMesh.receiveShadow = true
@@ -263,6 +302,10 @@ const createHexagonalGround = () => {
   wireframeHelpers.value.push(groundHelper)
 
   // Create walls
+
+  const wallInnerMaterial = feltMaterial.clone()
+  wallInnerMaterial.side = THREE.FrontSide
+
   for (let i = 0; i < 6; i++) {
     const nextI = (i + 1) % 6
     
@@ -293,12 +336,9 @@ const createHexagonalGround = () => {
     wallGeometry.setIndex(new THREE.BufferAttribute(indices, 1))
     wallGeometry.computeVertexNormals()
     
-    const wallMaterial = new THREE.MeshPhongMaterial({ 
-      color: 0x333333,
-      transparent: true,
-      opacity: 0.8,
-      side: THREE.DoubleSide
-    })
+    const wallMaterial = feltMaterial.clone()
+    wallMaterial.transparent = true
+    wallMaterial.opacity = 0.8
     
     const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial)
     wallMesh.receiveShadow = true
