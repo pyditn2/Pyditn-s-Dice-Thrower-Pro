@@ -75,11 +75,8 @@ export const useDiceState = () => {
       }
       rigidBody.setAngvel(angvel)
 
-      const newDice = { mesh, rigidBody }
-      dice.value.push(markRaw(mesh))
-      rigidBodies.value.push(markRaw(rigidBody))
+      return { mesh: markRaw(mesh), rigidBody: markRaw(rigidBody) }
       
-      return newDice
     } catch (error) {
       console.error('Error creating dice instance:', error)
       throw error
