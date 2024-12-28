@@ -4,22 +4,30 @@ import { useCharacterStore } from '../stores/characterStore'
 import { useDiceRollerStore } from '../stores/diceRollerStore'
 import DiceRoller from './DiceRoller.vue'
 import CharacterSelector from './CharacterSelector.vue'
+import SearchableDropdown from './SearchableDropdown.vue'
 import { CHECK_TYPES, DICE_TYPES } from '../constants/diceTypes'
 
 const characterStore = useCharacterStore()
 const diceRollerStore = useDiceRollerStore()
 const diceRoller1 = ref(null)
 const selectedAttribute = ref('MU')
-const selectedTalent = ref('Fliegen')
+const selectedTalent = ref(null)
 const result = ref(null)
 const diceRollers = ref([])
 const currentCheckType = ref(CHECK_TYPES.ATTRIBUTE)
-
 const modifier = ref(0)
 
-const searchQuery = ref('')
-const isDropdownOpen = ref(false)
-const searchInput = ref(null)
+// Define attributes list
+const attributes = [
+  { name: 'Mut', value: 'MU' },
+  { name: 'Klugheit', value: 'KL' },
+  { name: 'Intuition', value: 'IN' },
+  { name: 'Charisma', value: 'CH' },
+  { name: 'Fingerfertigkeit', value: 'FF' },
+  { name: 'Gewandheit', value: 'GE' },
+  { name: 'Konstitution', value: 'KO' },
+  { name: 'Körperkraft', value: 'KK' }
+]
 
 // Get talents from store
 const talents = computed(() => {
@@ -32,51 +40,15 @@ const talents = computed(() => {
   return allTalents
 })
 
-const filteredTalents = computed(() => {
-  if (!searchQuery.value) return talents.value
-  const query = searchQuery.value.toLowerCase()
-  return talents.value.filter(talent => 
-    talent.name.toLowerCase().includes(query)
-  )
-})
-
-const selectedTalentData = computed(() => {
-  if (!selectedTalent.value || !characterStore.activeCharacter) return null
-  
-  for (const category in characterStore.activeCharacter.talents) {
-    const talent = characterStore.activeCharacter.talents[category].find(t => t.name === selectedTalent.value)
-    if (talent) return talent
+const selectedAttributeObject = computed({
+  get: () => attributes.find(attr => attr.value === selectedAttribute.value) || attributes[0],
+  set: (newValue) => {
+    selectedAttribute.value = newValue?.value || 'MU'
   }
-  return null
 })
 
 const getAttributeValue = (attributeKey) => {
   return characterStore.activeCharacter?.stats.attributes[attributeKey] ?? 0
-}
-
-const selectTalent = (talent) => {
-  selectedTalent.value = talent.name
-  searchQuery.value = ''
-  isDropdownOpen.value = false
-}
-
-const onInputFocus = () => {
-  isDropdownOpen.value = true
-}
-
-const onClickOutside = (event) => {
-  const dropdown = document.querySelector('.talent-dropdown')
-  const input = document.querySelector('.talent-search')
-  if (dropdown && !dropdown.contains(event.target) && !input.contains(event.target)) {
-    isDropdownOpen.value = false
-  }
-}
-
-const selectFirstFilteredTalent = () => {
-  if (filteredTalents.value.length > 0) {
-    selectTalent(filteredTalents.value[0])
-    searchInput.value.blur()
-  }
 }
 
 const resetAllCameras = () => {
@@ -137,7 +109,7 @@ const performCheck = async () => {
         critical: roll[0] === 1 ? 'Kritischer Erfolg!' : (roll[0] === 20 ? 'Patzer!' : null)
       }
     } else if (currentCheckType.value === CHECK_TYPES.TALENT) {
-      const talent = selectedTalentData.value
+      const talent = selectedTalent.value
       if (!talent) return
 
       diceRoller1.value.updateViewMode(true)
@@ -197,14 +169,6 @@ const performCheck = async () => {
     console.error('Error during check:', error)
   }
 }
-
-onMounted(() => {
-  document.addEventListener('click', onClickOutside)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', onClickOutside)
-})
 </script>
 
 <template>
@@ -224,8 +188,8 @@ onUnmounted(() => {
               {{ selectedAttribute }} ({{ getAttributeValue(selectedAttribute) }})
             </div>
             <!-- Three labels for talent check -->
-            <div v-else-if="selectedTalentData" class="talent-dice-labels">
-              <div v-for="(attr, index) in selectedTalentData.attributes" 
+            <div v-else-if="selectedTalent" class="talent-dice-labels">
+              <div v-for="(attr, index) in selectedTalent.attributes" 
                    :key="index" 
                    class="dice-label"
                    :style="{ width: '300px' }">
@@ -254,52 +218,23 @@ onUnmounted(() => {
         </div>
         
         <div class="selection" v-if="currentCheckType === CHECK_TYPES.ATTRIBUTE">
-          <select v-model="selectedAttribute">
-            <option value="MU">Mut</option>
-            <option value="KL">Klugheit</option>
-            <option value="IN">Intuition</option>
-            <option value="CH">Charisma</option>
-            <option value="FF">Fingerfertigkeit</option>
-            <option value="GE">Gewandheit</option>
-            <option value="KO">Konstitution</option>
-            <option value="KK">Körperkraft</option>
-          </select>
+          <SearchableDropdown
+            v-model="selectedAttributeObject"
+            :items="attributes"
+            :display-field="(item) => item.name"
+            :value-field="(item) => item.value"
+            placeholder="Select an attribute..."
+          />
         </div>
         
         <div v-if="currentCheckType === CHECK_TYPES.TALENT" class="talent-selection">
-          <div class="talent-search-container">
-            <input
-              ref="searchInput"
-              type="text"
-              class="talent-search"
-              v-model="searchQuery"
-              placeholder="Talent suchen oder auswählen..."
-              @focus="onInputFocus"
-              @keydown.enter.prevent="selectFirstFilteredTalent"
-            />
-            <div v-if="selectedTalentData" class="selected-talent">
-              Ausgewählt: {{ selectedTalentData.name }} ({{ selectedTalentData.value }})
-            </div>
-            
-            <div v-show="isDropdownOpen" class="talent-dropdown">
-              <div v-if="filteredTalents.length === 0" class="no-results">
-                Keine Talente gefunden
-              </div>
-              <div
-                v-for="talent in filteredTalents"
-                :key="talent.name"
-                class="talent-option"
-                :class="{ 'selected': talent.name === selectedTalent }"
-                @click="selectTalent(talent)"
-              >
-                {{ talent.name }} ({{ talent.value }})
-              </div>
-            </div>
-          </div>
-          
-          <div v-if="selectedTalentData" class="talent-info">
-            Talentwert: {{ selectedTalentData.value }}
-          </div>
+          <SearchableDropdown
+            v-model="selectedTalent"
+            :items="talents"
+            :display-field="(item) => item.name"
+            :value-field="(item) => item.value"
+            placeholder="Search for a talent..."
+          />
         </div>
         
         <div class="modifier">
@@ -352,50 +287,13 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.talent-search-container {
-  position: relative;
-  width: 100%;
-}
 
-.talent-search {
-  width: 100%;
-  padding: 0.5rem;
-  background: #333;
-  color: white;
-  border: 1px solid #444;
-  border-radius: 4px;
-  margin-bottom: 0.5rem;
-}
 
 .talent-search:focus {
   outline: none;
   border-color: #42b983;
 }
 
-.selected-talent {
-  font-size: 0.9rem;
-  color: #42b983;
-  margin-bottom: 0.5rem;
-}
-
-.talent-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  max-height: 300px;
-  overflow-y: auto;
-  background: #1a1a1a;
-  border: 1px solid #444;
-  border-radius: 4px;
-  z-index: 1000;
-}
-
-.talent-option {
-  padding: 0.5rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
 
 .talent-option:hover {
   background: #333;
@@ -404,12 +302,6 @@ onUnmounted(() => {
 .talent-option.selected {
   background: #42b983;
   color: white;
-}
-
-.no-results {
-  padding: 0.5rem;
-  text-align: center;
-  color: #666;
 }
 
 .character-selection-bar {
