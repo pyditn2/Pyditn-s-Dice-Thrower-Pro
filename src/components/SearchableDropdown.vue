@@ -1,5 +1,3 @@
-# SearchableDropdown.vue
-# SearchableDropdown.vue
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 

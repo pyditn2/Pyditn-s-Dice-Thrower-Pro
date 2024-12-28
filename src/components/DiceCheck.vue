@@ -11,7 +11,9 @@ const characterStore = useCharacterStore()
 const diceRollerStore = useDiceRollerStore()
 const diceRoller1 = ref(null)
 const selectedAttribute = ref('MU')
-const selectedTalent = ref(null)
+const selectedTalent = computed(() => {
+  return talents.value.length > 0 ? talents.value[0] : null
+})
 const result = ref(null)
 const diceRollers = ref([])
 const currentCheckType = ref(CHECK_TYPES.ATTRIBUTE)
