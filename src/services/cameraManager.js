@@ -1,18 +1,31 @@
 import * as THREE from 'three'
+import { markRaw } from 'vue'
 
 export class CameraManager {
   constructor(scene, containerWidth, containerHeight) {
-    this.cameras = []
-    this.cameraStates = []
+    // Mark raw all THREE.js objects to prevent Vue reactivity
+    this.cameras = Array(3).fill(null).map(() => 
+      markRaw(new THREE.PerspectiveCamera(45, containerWidth / containerHeight, 0.1, 1000))
+    )
+    this.cameraStates = Array(3).fill(null).map(() => ({
+      mode: 'overview',
+      settleTime: null
+    }))
+    
+    // Mark raw all Vector3 and other THREE.js objects
+    this.lastDiePositions = Array(3).fill(null).map(() => 
+      markRaw(new THREE.Vector3(0, 0, 0))
+    )
+    
     this.settleTime = null
     this.SETTLE_DISPLAY_DURATION = 5000
     this.NUMBER_OF_CAMERAS = 3
     this.hasCompletedTopdown = new Set()
-    this.rotationSpeeds = new Array(this.NUMBER_OF_CAMERAS).fill(0).map(() => Math.random() * 0.5 + 0.5) // 0.5 to 1.0 radians per second
-    this.individualRotationAngles = new Array(this.NUMBER_OF_CAMERAS).fill(0)
-    this.lastDiePositions = new Array(this.NUMBER_OF_CAMERAS).fill(null)
+    this.rotationSpeeds = new Array(3).fill(0).map(() => Math.random() * 0.5 + 0.5)
+    this.individualRotationAngles = new Array(3).fill(0)
     this.lastUpdateTime = Date.now()
-    this.setupCameras(containerWidth, containerHeight)
+
+    this.resetCameras()
   }
 
   setupCameras(width, height) {
@@ -35,6 +48,8 @@ export class CameraManager {
     this.individualRotationAngles = new Array(this.NUMBER_OF_CAMERAS).fill(0)
     this.lastDiePositions = new Array(this.NUMBER_OF_CAMERAS).fill(null)
     this.lastUpdateTime = Date.now()
+    
+    // Don't reset camera positions, only states
     this.cameraStates.forEach(state => {
       state.mode = 'overview'
       state.settleTime = null
@@ -118,66 +133,70 @@ export class CameraManager {
   updateRotatingCamera(camera, index, rotationAngle, deltaTime) {
     const radius = 8
     
-    // Update rotation angle based on time
     this.individualRotationAngles[index] += this.rotationSpeeds[index] * deltaTime
     const totalAngle = rotationAngle + this.individualRotationAngles[index]
     
-    const diePosition = this.lastDiePositions[index] || new THREE.Vector3(0, 0, 0)
+    // Create temporary vectors that won't be reactive
+    const diePosition = this.lastDiePositions[index] || markRaw(new THREE.Vector3(0, 0, 0))
+    const newPosition = markRaw(new THREE.Vector3(
+      diePosition.x + Math.cos(totalAngle) * radius,
+      diePosition.y + 5,
+      diePosition.z + Math.sin(totalAngle) * radius
+    ))
     
-    const x = diePosition.x + Math.cos(totalAngle) * radius
-    const z = diePosition.z + Math.sin(totalAngle) * radius
-    const y = diePosition.y + 5
-    
-    camera.position.lerp(new THREE.Vector3(x, y, z), 0.02)
+    camera.position.lerp(newPosition, 0.02)
     camera.lookAt(diePosition)
   }
 
   resetCameras() {
+    const defaultPositions = [
+      markRaw(new THREE.Vector3(0, 8, 12)),
+      markRaw(new THREE.Vector3(-8, 8, 8)),
+      markRaw(new THREE.Vector3(8, 8, 8))
+    ]
+    
     this.cameras.forEach((camera, index) => {
-      const defaultPositions = [
-        new THREE.Vector3(0, 8, 12),    // Main view
-        new THREE.Vector3(-8, 8, 8),    // Left view
-        new THREE.Vector3(8, 8, 8)      // Right view
-      ];
-      camera.position.copy(defaultPositions[index]);
-      camera.lookAt(0, 0, 0);
-    });
+      camera.position.copy(defaultPositions[index])
+      camera.lookAt(markRaw(new THREE.Vector3(0, 0, 0)))
+    })
   }
 
   updateFollowingCamera(camera, die) {
-    const diePosition = die.position
+    const diePosition = markRaw(die.position.clone())
     const radius = 8
+    
+    // Keep current angle to prevent sudden changes
     const currentAngle = Math.atan2(
       camera.position.z - diePosition.z,
       camera.position.x - diePosition.x
     )
     
-    const targetPosition = new THREE.Vector3(
+    const targetPosition = markRaw(new THREE.Vector3(
       diePosition.x + radius * Math.cos(currentAngle),
       diePosition.y + 5,
       diePosition.z + radius * Math.sin(currentAngle)
-    )
+    ))
     
-    camera.position.lerp(targetPosition, 0.1)
+    // Use slower lerp for smoother transitions
+    camera.position.lerp(targetPosition, 0.05)
     camera.lookAt(diePosition)
   }
 
   updateTopdownCamera(camera, die) {
-    const diePosition = die.position
+    const diePosition = markRaw(die.position.clone())
     const index = this.cameras.indexOf(camera)
     
-    // Store die position for later use in rotating mode
     this.lastDiePositions[index] = diePosition.clone()
     
-    const desiredPosition = new THREE.Vector3(
+    const desiredPosition = markRaw(new THREE.Vector3(
       diePosition.x,
       diePosition.y + 5,
       diePosition.z
-    )
+    ))
     camera.position.lerp(desiredPosition, 0.1)
     
-    const targetRotation = new THREE.Euler(-Math.PI/2, 0, 0)
-    const targetQuaternion = new THREE.Quaternion().setFromEuler(targetRotation)
+    const targetRotation = markRaw(new THREE.Euler(-Math.PI/2, 0, 0))
+    const targetQuaternion = markRaw(new THREE.Quaternion().setFromEuler(targetRotation))
     camera.quaternion.slerp(targetQuaternion, 0.1)
   }
 
