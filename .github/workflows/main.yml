@@ -8,24 +8,41 @@ on:
 
 jobs:
   bump-version:
-    runs-on: ubuntu-latest  # Only run the version bump on Linux
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
-      new_tag: ${{ steps.bump_version.outputs.new_tag }}
+      new_version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Get package version
+        id: version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          # Split version into parts
+          IFS='.' read -r -a VERSION_PARTS <<< "$CURRENT_VERSION"
+          # Increment patch version
+          PATCH=$((VERSION_PARTS[2] + 1))
+          NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$PATCH"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           
-      - name: Bump version
-        id: bump_version
-        uses: anothrNick/github-tag-action@1.67.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: true
-          DEFAULT_BUMP: patch
+      - name: Update package.json version
+        run: |
+          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json
+          git commit -m "Bump version to ${{ steps.version.outputs.version }}"
+          git push
 
   publish-tauri:
-    needs: bump-version  # Wait for bump-version job to complete
+    needs: bump-version
     permissions:
       contents: write
     strategy:
@@ -42,6 +59,8 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main # Make sure we get the updated package.json
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -54,10 +73,6 @@ jobs:
         with:
           node-version: lts/*
           cache: 'npm'
-
-      - name: Update version in package.json
-        run: |
-          npm version ${{ needs.bump-version.outputs.new_tag }} --no-git-tag-version
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -76,8 +91,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ needs.bump-version.outputs.new_tag }}
-          releaseName: 'PDTP ${{ needs.bump-version.outputs.new_tag }}'
+          tagName: v${{ needs.bump-version.outputs.new_version }}
+          releaseName: 'PDTP v${{ needs.bump-version.outputs.new_version }}'
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: false
           prerelease: false
