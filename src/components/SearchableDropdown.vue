@@ -107,7 +107,7 @@ onUnmounted(() => {
     />
     
     <div v-if="modelValue" class="selected-item">
-      Selected: {{ selectedDisplay }}
+      Ausgewählt: {{ selectedDisplay }}
       <div v-if="valueField(modelValue)" class="selected-value">
         ({{ valueField(modelValue) }})
       </div>
@@ -115,7 +115,7 @@ onUnmounted(() => {
     
     <div v-show="isDropdownOpen" class="searchable-dropdown">
       <div v-if="filteredItems.length === 0" class="no-results">
-        No items found
+        Nichts gefunden
       </div>
       <div
         v-for="item in filteredItems"
