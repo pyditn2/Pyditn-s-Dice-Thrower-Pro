@@ -11,9 +11,20 @@ const characterStore = useCharacterStore()
 const diceRollerStore = useDiceRollerStore()
 const diceRoller1 = ref(null)
 const selectedAttribute = ref('MU')
-const selectedTalent = computed(() => {
-  return talents.value.length > 0 ? talents.value[0] : null
+const selectedTalentId = ref(null)
+
+const selectedTalent = computed({
+  get: () => {
+    if (selectedTalentId.value === null && talents.value.length > 0) {
+      selectedTalentId.value = talents.value[0].name
+    }
+    return talents.value.find(talent => talent.name === selectedTalentId.value) || null
+  },
+  set: (newTalent) => {
+    selectedTalentId.value = newTalent?.name || null
+  }
 })
+
 const result = ref(null)
 const diceRollers = ref([])
 const currentCheckType = ref(CHECK_TYPES.ATTRIBUTE)
@@ -225,7 +236,7 @@ const performCheck = async () => {
             :items="attributes"
             :display-field="(item) => item.name"
             :value-field="(item) => item.value"
-            placeholder="Select an attribute..."
+            placeholder="Attribut aussuchen..."
           />
         </div>
         
@@ -235,7 +246,7 @@ const performCheck = async () => {
             :items="talents"
             :display-field="(item) => item.name"
             :value-field="(item) => item.value"
-            placeholder="Search for a talent..."
+            placeholder="Talent aussuchen..."
           />
         </div>
         
