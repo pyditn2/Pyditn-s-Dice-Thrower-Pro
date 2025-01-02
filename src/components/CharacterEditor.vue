@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useCharacterStore } from '../stores/characterStore'
 import CharacterSelector from './CharacterSelector.vue'
+import WeaponsSection from './WeaponsSection.vue'
 
 const characterStore = useCharacterStore()
 
@@ -167,6 +168,7 @@ const deleteCurrentCharacter = () => {
             </div>
           </div>
         </div>
+        <WeaponsSection />
       </div>
     </div>
     

@@ -139,7 +139,8 @@ export const useCharacterStore = defineStore('character', {
         this.characters[firstCharId] = {
           characterInfo: existingData.characterInfo || {},
           stats: existingData.stats || {},
-          talents: existingData.talents || {}
+          talents: existingData.talents || {},
+          weapons: []
         }
         
         // Only set activeCharacterId if none is currently selected
@@ -147,6 +148,51 @@ export const useCharacterStore = defineStore('character', {
           this.activeCharacterId = firstCharId
         }
       }
+    },
+
+    addWeapon() {
+      if (!this.activeCharacterId) return
+      
+      const newWeapon = {
+        id: Date.now().toString(),
+        name: '',
+        type: '',
+        at: 0,
+        pa: 0,
+        atBonus: 0,
+        paBonus: 0,
+        tp: {
+          diceCount: 1,
+          diceType: 6,
+          modifier: 0
+        },
+        notes: ''
+      }
+      
+      this.characters[this.activeCharacterId].weapons = 
+        this.characters[this.activeCharacterId].weapons || []
+      this.characters[this.activeCharacterId].weapons.push(newWeapon)
+    },
+
+    updateWeapon(weaponId, field, value) {
+      if (!this.activeCharacterId) return
+      
+      const weapons = this.characters[this.activeCharacterId].weapons
+      const weaponIndex = weapons.findIndex(w => w.id === weaponId)
+      
+      if (weaponIndex !== -1) {
+        weapons[weaponIndex] = {
+          ...weapons[weaponIndex],
+          [field]: value
+        }
+      }
+    },
+
+    deleteWeapon(weaponId) {
+      if (!this.activeCharacterId) return
+      
+      this.characters[this.activeCharacterId].weapons = 
+        this.characters[this.activeCharacterId].weapons.filter(w => w.id !== weaponId)
     },
 
     createCharacter() {
@@ -171,6 +217,7 @@ export const useCharacterStore = defineStore('character', {
             KK: 8   // Körperkraft
           }
         },
+        weapons: [],
     
         talents: {
           koerpertalente: [
@@ -287,7 +334,53 @@ export const useCharacterStore = defineStore('character', {
       this.characters[this.activeCharacterId].characterInfo[field] = value
     }
   },
+  addWeapon() {
+    if (!this.activeCharacterId) return
+    
+    const newWeapon = {
+      id: Date.now().toString(),
+      name: '',
+      type: '',
+      at: 0,
+      pa: 0,
+      atBonus: 0,
+      paBonus: 0,
+      tp: {
+        diceCount: 1,
+        diceType: 6,
+        modifier: 0
+      },
+      notes: ''
+    }
+    
+    // Ensure weapons array exists
+    if (!this.characters[this.activeCharacterId].weapons) {
+      this.characters[this.activeCharacterId].weapons = []
+    }
+    
+    this.characters[this.activeCharacterId].weapons.push(newWeapon)
+  },
 
-  // Enable persistence
+  updateWeapon(weaponId, field, value) {
+    if (!this.activeCharacterId) return
+    
+    const weapons = this.characters[this.activeCharacterId].weapons
+    const weaponIndex = weapons.findIndex(w => w.id === weaponId)
+    
+    if (weaponIndex !== -1) {
+      weapons[weaponIndex] = {
+        ...weapons[weaponIndex],
+        [field]: value
+      }
+    }
+  },
+
+  deleteWeapon(weaponId) {
+    if (!this.activeCharacterId) return
+    
+    this.characters[this.activeCharacterId].weapons = 
+      this.characters[this.activeCharacterId].weapons.filter(w => w.id !== weaponId)
+  },
+
   persist: true
 })
