@@ -320,7 +320,7 @@ const performCheck = async () => {
 .character-selection-bar {
   margin-bottom: 1rem;
   width: 100%;
-  max-width: 400px;
+  max-width: 26rem;
 }
 
 .character-select {
