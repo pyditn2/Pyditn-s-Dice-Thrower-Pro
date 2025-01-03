@@ -13,12 +13,14 @@ const activeTab = ref('dice')
     <div class="tab-navigation">
       <button 
         :class="{ active: activeTab === 'dice' }"
+        class="tab-button"
         @click="activeTab = 'dice'"
       >
         Würfelproben
       </button>
       <button 
         :class="{ active: activeTab === 'character' }"
+        class="tab-button"
         @click="activeTab = 'character'"
       >
         Charakterwerte
@@ -40,14 +42,15 @@ html, body {
   background-color: #000000;
   color: #ffffff;
 }
-
 .app {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
   min-height: 100vh;
   background-color: #000000;
+  text-align: center;
 }
+
 
 .tab-navigation {
   display: flex;
