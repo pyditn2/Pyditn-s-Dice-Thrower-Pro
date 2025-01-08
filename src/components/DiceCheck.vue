@@ -186,8 +186,6 @@ const performCheck = async () => {
 
 <template>
   <div class="dice-check">
-    <CharacterSelector />
-    
     <div v-if="characterStore.activeCharacter">
       <h2>Würfelprobe</h2>
       
@@ -300,38 +298,6 @@ const performCheck = async () => {
 </template>
 
 <style scoped>
-
-
-.talent-search:focus {
-  outline: none;
-  border-color: #42b983;
-}
-
-
-.talent-option:hover {
-  background: #333;
-}
-
-.talent-option.selected {
-  background: #42b983;
-  color: white;
-}
-
-.character-selection-bar {
-  margin-bottom: 1rem;
-  width: 100%;
-  max-width: 400px;
-}
-
-.character-select {
-  width: 100%;
-  padding: 0.5rem;
-  background: #333;
-  color: white;
-  border: 1px solid #444;
-  border-radius: 4px;
-}
-
 .no-character-selected {
   text-align: center;
   padding: 2rem;
@@ -388,13 +354,6 @@ const performCheck = async () => {
   height: 300px;
 }
 
-.talent-dice-views {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
 .dice-wrapper {
   display: flex;
   flex-direction: column;
@@ -405,9 +364,10 @@ const performCheck = async () => {
 .single-dice-label {
   text-align: center;
   color: #42b983;
+  text-shadow: #42b983 0 0 4px;
   font-weight: bold;
   font-size: 0.9rem;
-  margin-top: 0.5rem;
+  margin: 0.5rem auto;
 }
 
 .talent-dice-labels {
@@ -415,21 +375,17 @@ const performCheck = async () => {
   justify-content: center;
   width: 100%;
   padding: 0 1rem;
-  margin-top: 0.5rem;
+  margin: 0.5rem auto;
 }
 
 .dice-label {
   text-align: center;
   color: #42b983;
+  text-shadow: #42b983 0 0 4px;
   font-weight: bold;
   font-size: 0.9rem;
   flex: 1;
   margin: 0 0.5rem;
-}
-
-.dice-roller {
-  width: 300px;
-  height: 300px;
 }
 
 .controls {
@@ -445,7 +401,7 @@ const performCheck = async () => {
 .check-type {
   display: flex;
   gap: 0.5rem;
-  width: 100%;
+  width: 26rem;
 }
 
 .check-type button {
