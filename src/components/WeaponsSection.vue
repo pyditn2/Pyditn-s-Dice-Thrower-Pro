@@ -215,6 +215,7 @@ const updateTpField = (weaponId, field, value) => {
   margin-right: 0.5rem;
 }
 
+
 .delete-weapon-btn {
   background: #ff4444;
   color: white;
@@ -249,7 +250,7 @@ const updateTpField = (weaponId, field, value) => {
 .weapon-stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
+  gap: 2rem;
 }
 
 .stat-field {
@@ -305,20 +306,6 @@ textarea {
   margin-bottom: 0.5rem;
 }
 
-.roll-button {
-  background: #42b983;
-  color: white;
-  border: none;
-  padding: 0.25rem 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.roll-button:hover {
-  background: #3aa876;
-}
-
 .tp-inputs {
   margin-bottom: 0.5rem;
 }
@@ -341,30 +328,6 @@ textarea {
   padding: 0.25rem !important;
 }
 
-.tp-result {
-  background: #333;
-  padding: 0.5rem;
-  border-radius: 4px;
-  animation: fadeIn 0.3s ease-out;
-}
-
-.result-details {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.total {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #42b983;
-}
-
-.rolls {
-  color: #999;
-  font-size: 0.9rem;
-}
-
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -380,6 +343,8 @@ textarea {
 @media (max-width: 768px) {
   .weapons-grid {
     grid-template-columns: 1fr;
+    width: 100%;
+
   }
   
   .tp-field {

@@ -1,7 +1,6 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useCharacterStore } from '../stores/characterStore'
-import CharacterSelector from './CharacterSelector.vue'
 import WeaponsSection from './WeaponsSection.vue'
 
 const characterStore = useCharacterStore()
@@ -68,18 +67,17 @@ const deleteCurrentCharacter = () => {
 
 <template>
   <div class="character-editor">
-    <CharacterSelector />
 
     <div v-if="characterStore.activeCharacter" class="editor-layout">
       <!-- Character Info Sidebar -->
       <div class="character-info-sidebar">
-        <div class="info-section">
+        <div class="section info-section">
           <h3>Charakterinformationen</h3>
           <div class="info-field">
             <label for="char-name">Name</label>
-            <input 
+            <input
               id="char-name"
-              type="text" 
+              type="text"
               :value="characterStore.activeCharacter.characterInfo.name"
               @input="e => updateCharacterInfo('name', e.target.value)"
               placeholder="Charaktername"
@@ -87,9 +85,9 @@ const deleteCurrentCharacter = () => {
           </div>
           <div class="info-field">
             <label for="char-species">Spezies</label>
-            <input 
+            <input
               id="char-species"
-              type="text" 
+              type="text"
               :value="characterStore.activeCharacter.characterInfo.spezies"
               @input="e => updateCharacterInfo('spezies', e.target.value)"
               placeholder="Spezies"
@@ -97,9 +95,9 @@ const deleteCurrentCharacter = () => {
           </div>
           <div class="info-field">
             <label for="char-culture">Kultur</label>
-            <input 
+            <input
               id="char-culture"
-              type="text" 
+              type="text"
               :value="characterStore.activeCharacter.characterInfo.kultur"
               @input="e => updateCharacterInfo('kultur', e.target.value)"
               placeholder="Kultur"
@@ -107,9 +105,9 @@ const deleteCurrentCharacter = () => {
           </div>
           <div class="info-field">
             <label for="char-profession">Profession</label>
-            <input 
+            <input
               id="char-profession"
-              type="text" 
+              type="text"
               :value="characterStore.activeCharacter.characterInfo.profession"
               @input="e => updateCharacterInfo('profession', e.target.value)"
               placeholder="Profession"
@@ -143,10 +141,14 @@ const deleteCurrentCharacter = () => {
         <!-- Talents Section -->
         <div class="section">
           <h3>Talente</h3>
-          <div v-for="(talents, categoryKey) in characterStore.activeCharacter.talents" 
+          <div v-for="(talents, categoryKey, index) in characterStore.activeCharacter.talents"
                :key="categoryKey" 
                class="talent-category">
-            <h4>{{ categoryNames[categoryKey] }}</h4>
+            <h4
+                :style="{ marginTop: index === 0 ? '0rem' : '' }"
+                class="category-name">
+              {{ categoryNames[categoryKey] }}
+            </h4>
             <div class="talents-grid">
               <div v-for="(talent, index) in talents" 
                    :key="talent.name" 
@@ -181,6 +183,8 @@ const deleteCurrentCharacter = () => {
 <style scoped>
 .character-editor {
   padding: 1rem;
+  margin: auto auto 1rem;
+  max-width: 98%;
   color: white;
 }
 
@@ -200,12 +204,10 @@ const deleteCurrentCharacter = () => {
   background: #1a1a1a;
   border-radius: 8px;
   padding: 1rem;
-  width: 280px;
 }
 
 .info-field {
-  margin-bottom: 1rem;
-  width: 250px;
+  margin: auto auto 1rem;
 }
 
 .info-field label {
@@ -215,7 +217,7 @@ const deleteCurrentCharacter = () => {
 }
 
 .info-field input {
-  width: 250px; 
+  width: 250px;
   padding: 0.5rem;
   background: #333;
   border: 1px solid #444;
@@ -239,16 +241,6 @@ const deleteCurrentCharacter = () => {
   margin-bottom: 1rem;
 }
 
-h3 {
-  color: #42b983;
-  margin-bottom: 1rem;
-}
-
-h4 {
-  color: #999;
-  margin: 1rem 0;
-}
-
 .attributes-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -262,6 +254,10 @@ h4 {
   background: #333;
   padding: 0.75rem;
   border-radius: 4px;
+}
+
+.category-name {
+  margin: 3rem 0 1.5rem 0;
 }
 
 .talents-grid {
@@ -298,6 +294,8 @@ input[type="number"] {
   color: white;
   border-radius: 4px;
   text-align: center;
+  appearance: textfield;
+  -moz-appearance: textfield;
 }
 
 input[type="number"]:focus {
@@ -311,10 +309,6 @@ input[type="number"]::-webkit-outer-spin-button {
   margin: 0;
 }
 
-input[type="number"] {
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
 
 .no-character-selected {
   text-align: center;
@@ -327,22 +321,14 @@ input[type="number"] {
 @media (max-width: 1024px) {
   .editor-layout {
     flex-direction: column;
-  }
-  
-  .character-info-sidebar {
-    width: 100%;
+    gap: unset;
   }
 
-  .info-section {
+  .character-info-sidebar, .info-field, .info-field input {
     width: 100%;
-  }
-
-  .info-field {
-    width: 100%;
-  }
-
-  .info-field input {
-    width: 100%;
+    width: -moz-available;          /* WebKit-based browsers will ignore this. */
+    width: -webkit-fill-available;  /* Mozilla-based browsers will ignore this. */
+    width: fill-available;
   }
 }
 
@@ -351,15 +337,19 @@ input[type="number"] {
   .talents-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .talent-item {
     flex-direction: column;
     align-items: stretch;
     gap: 0.5rem;
   }
-  
+
   .talent-item input {
+    margin: auto;
     width: 100%;
+    width: -moz-available;
+    width: -webkit-fill-available;
+    width: fill-available;
   }
 }
 </style>

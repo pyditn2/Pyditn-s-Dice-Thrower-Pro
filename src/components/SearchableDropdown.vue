@@ -112,7 +112,7 @@ onUnmounted(() => {
         ({{ valueField(modelValue) }})
       </div>
     </div>
-    
+
     <div v-show="isDropdownOpen" class="searchable-dropdown">
       <div v-if="filteredItems.length === 0" class="no-results">
         Nichts gefunden
