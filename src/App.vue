@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { invoke } from "@tauri-apps/api/core"
 import DiceCheck from './components/DiceCheck.vue'
 import CharacterEditor from './components/CharacterEditor.vue'
+import CharacterSelector from "./components/CharacterSelector.vue";
 
 const activeTab = ref('dice')
 </script>
@@ -29,6 +30,7 @@ const activeTab = ref('dice')
 
     <!-- Tab Content -->
     <div class="tab-content">
+      <CharacterSelector />
       <DiceCheck v-if="activeTab === 'dice'" />
       <CharacterEditor v-if="activeTab === 'character'" />
     </div>
@@ -55,9 +57,10 @@ html, body {
 .tab-navigation {
   display: flex;
   gap: 1rem;
-  margin-bottom: 1rem;
   border-bottom: 1px solid #333;
   padding-bottom: 0.5rem;
+  justify-content: center;
+  margin: auto auto 1rem;
 }
 
 .tab-button {
@@ -96,6 +99,35 @@ button, input, select {
 button:hover {
   background-color: #444444;
 }
+
+h1, h2, h3, h4, label, .talent-name, .selected-item, .weapon-header {
+  user-select: none;
+}
+
+
+h2 {
+  color: #42b983;
+  margin-bottom: 2rem;
+  font-size: 1.75rem;
+  margin-top: 0 !important;
+  text-shadow: 0 0 8px #42b983;
+}
+
+
+h3 {
+  color: #42b983;
+  margin-bottom: 1rem;
+  font-size: 1.35rem;
+  margin-top: 0 !important;
+  text-shadow: 0 0 4px #42b983;
+}
+
+h4 {
+  color: #999;
+  font-size: 1.1rem;
+  margin: 1rem 0;
+}
+
 
 option {
   background-color: #333333;

@@ -43,7 +43,8 @@ const deleteCurrentCharacter = () => {
 
 <style scoped>
 .character-selection-bar {
-  margin-bottom: 1rem;
+  margin: auto auto 1rem;
+  width: max-content;
   padding: 1rem;
   background: #1a1a1a;
   border-radius: 8px;
@@ -93,6 +94,7 @@ const deleteCurrentCharacter = () => {
 @media (max-width: 768px) {
   .character-selection-bar {
     flex-direction: column;
+    width: 92%;
   }
 
   .character-select {
