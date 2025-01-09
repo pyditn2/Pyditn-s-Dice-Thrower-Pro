@@ -12,6 +12,7 @@ export const useDiceState = () => {
   // Camera and renderer configuration
   const renderers = ref([])
   const showExtraViews = ref(false)
+  const currentContainers = ref([])  // Keep track of current containers
   
   // Compute number of views needed based on dice count
   const requiredViews = computed(() => 
@@ -19,25 +20,41 @@ export const useDiceState = () => {
   )
 
   const setupViews = (containerRefs) => {
-    renderers.value = Array(3).fill(null).map(() => {
-      const renderer = markRaw(new THREE.WebGLRenderer({ antialias: true }))
+    // Store current containers
+    currentContainers.value = containerRefs
+
+    // Clear existing renderers
+    renderers.value.forEach(renderer => {
+      if (renderer && renderer.domElement && renderer.domElement.parentNode) {
+        renderer.domElement.parentNode.removeChild(renderer.domElement)
+      }
+    })
+
+    // Create new renderers for each container
+    renderers.value = containerRefs.map(() => {
+      const renderer = new THREE.WebGLRenderer({ antialias: true })
       renderer.setSize(300, 300)
       renderer.shadowMap.enabled = true
       renderer.shadowMap.type = THREE.PCFSoftShadowMap
-      return renderer
+      return markRaw(renderer)
     })
 
-    attachRenderers(containerRefs)
-  }
-
-  const attachRenderers = (containerRefs) => {
+    // Attach renderers to containers
     renderers.value.forEach((renderer, index) => {
-      const container = containerRefs[index]?.value
+      const container = containerRefs[index]
       if (container) {
         container.innerHTML = ''
         container.appendChild(renderer.domElement)
       }
     })
+  }
+
+  const updateViewMode = (showExtra) => {
+    showExtraViews.value = showExtra
+    // Re-setup views with current containers if they exist
+    if (showExtra && currentContainers.value.length > 0) {
+      setupViews(currentContainers.value)
+    }
   }
 
   const resetDice = () => {
@@ -76,7 +93,6 @@ export const useDiceState = () => {
       rigidBody.setAngvel(angvel)
 
       return { mesh: markRaw(mesh), rigidBody: markRaw(rigidBody) }
-      
     } catch (error) {
       console.error('Error creating dice instance:', error)
       throw error
@@ -113,16 +129,6 @@ export const useDiceState = () => {
         })
       }
     })
-  
-    if (dice.length === 0 && cameraManager) {
-      for (let i = 0; i < 3; i++) {
-        cameraManager.setMode('overview', i)
-      }
-    }
-  }
-
-  const updateViewMode = (showExtra) => {
-    showExtraViews.value = showExtra
   }
 
   const getUpFacingNumber = (die) => {

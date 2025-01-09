@@ -12,6 +12,8 @@ const diceRollerStore = useDiceRollerStore()
 const diceRoller1 = ref(null)
 const selectedAttribute = ref('MU')
 const selectedTalentId = ref(null)
+const selectedWeaponId = ref(null)
+const showDamageRoll = ref(false)
 
 const selectedTalent = computed({
   get: () => {
@@ -22,6 +24,18 @@ const selectedTalent = computed({
   },
   set: (newTalent) => {
     selectedTalentId.value = newTalent?.name || null
+  }
+})
+
+const weapons = computed(() => {
+  return characterStore.activeCharacter?.weapons || []
+})
+
+const selectedWeapon = computed({
+  get: () => weapons.value.find(weapon => weapon.id === selectedWeaponId.value) || null,
+  set: (newWeapon) => {
+    selectedWeaponId.value = newWeapon?.id || null
+    showDamageRoll.value = false
   }
 })
 
@@ -91,12 +105,30 @@ const checkCriticalRolls = (rolls) => {
   return null
 }
 
+const rollDamage = async (weapon) => {
+  const { diceCount, diceType, modifier } = weapon.tp
+  
+  // Force multiple dice views for damage roll
+  diceRoller1.value.updateViewMode(true)  // Enable multiple views
+  const rolls = await diceRoller1.value.rollDice(`d${diceType}`, diceCount)
+  const damage = rolls.reduce((sum, roll) => sum + roll, 0) + modifier
+  
+  result.value = {
+    ...result.value,
+    damageRolls: rolls,
+    totalDamage: damage
+  }
+}
+
 const performCheck = async () => {
   console.log('performCheck called')
   if (!characterStore.activeCharacter) {
     alert('Bitte wählen Sie zuerst einen Charakter aus.')
     return
   }
+  
+  showDamageRoll.value = false
+  
   try {
     if (currentCheckType.value === CHECK_TYPES.ATTRIBUTE) {
       diceRoller1.value.updateViewMode(false)
@@ -177,6 +209,36 @@ const performCheck = async () => {
           modifier: modifier.value
         }
       }
+    } else if (currentCheckType.value === CHECK_TYPES.COMBAT) {
+      if (!selectedWeapon.value) {
+        alert('Bitte wählen Sie eine Waffe aus.')
+        return
+      }
+
+      // Set to single view for attack roll
+      diceRoller1.value.updateViewMode(false)
+      const roll = await diceRoller1.value.rollDice('d20', 1)
+      const attackValue = selectedWeapon.value.at + selectedWeapon.value.atBonus + modifier.value
+      
+      const success = roll[0] === 1 || (roll[0] <= attackValue && roll[0] !== 20)
+      const remainingPoints = success ? attackValue - roll[0] : 0
+      const qualityLevel = success ? calculateQS(remainingPoints) : 0
+      
+      result.value = {
+        type: 'combat',
+        weapon: selectedWeapon.value.name,
+        rolls: [roll[0]],
+        target: attackValue,
+        success,
+        remainingPoints,
+        qualityLevel,
+        critical: roll[0] === 1 ? 'Kritischer Treffer!' : (roll[0] === 20 ? 'Patzer!' : null)
+      }
+
+      if (success) {
+        showDamageRoll.value = true
+        await rollDamage(selectedWeapon.value)
+      }
     }
   } catch (error) {
     console.error('Error during check:', error)
@@ -189,27 +251,38 @@ const performCheck = async () => {
     <div v-if="characterStore.activeCharacter">
       <h2>Würfelprobe</h2>
       
-      <!-- Dice roller container -->
-      <div class="dice-rollers">
-        <div class="dice-views">
-          <div class="dice-wrapper">
-            <DiceRoller ref="diceRoller1" class="dice-roller" />
-            <!-- Single label for attribute check -->
-            <div v-if="currentCheckType === CHECK_TYPES.ATTRIBUTE" class="single-dice-label">
-              {{ selectedAttribute }} ({{ getAttributeValue(selectedAttribute) }})
-            </div>
-            <!-- Three labels for talent check -->
-            <div v-else-if="selectedTalent" class="talent-dice-labels">
-              <div v-for="(attr, index) in selectedTalent.attributes" 
-                   :key="index" 
-                   class="dice-label"
-                   :style="{ width: '300px' }">
-                {{ attr }} ({{ getAttributeValue(attr) }})
-              </div>
-            </div>
+      <!-- Simplified dice roller container -->
+      <DiceRoller ref="diceRoller1" class="dice-roller" />
+      
+      <!-- Labels container -->
+      <div class="dice-labels">
+        <!-- Single label for attribute check -->
+        <div v-if="currentCheckType === CHECK_TYPES.ATTRIBUTE" class="single-dice-label">
+          {{ selectedAttribute }} ({{ getAttributeValue(selectedAttribute) }})
+        </div>
+        <!-- Three labels for talent check -->
+        <div v-else-if="currentCheckType === CHECK_TYPES.TALENT && selectedTalent" class="talent-dice-labels">
+          <div v-for="(attr, index) in selectedTalent.attributes" 
+               :key="index" 
+               class="dice-label">
+            {{ attr }} ({{ getAttributeValue(attr) }})
           </div>
         </div>
+        <!-- Labels for combat check -->
+        <template v-else-if="currentCheckType === CHECK_TYPES.COMBAT && selectedWeapon">
+          <div v-if="!showDamageRoll" class="single-dice-label">
+            {{ selectedWeapon.name }} (AT: {{ selectedWeapon.at + selectedWeapon.atBonus }})
+          </div>
+          <div v-else class="damage-dice-labels">
+            <div v-for="(roll, index) in (selectedWeapon.tp.diceCount)" 
+                 :key="index" 
+                 class="dice-label">
+              W{{ selectedWeapon.tp.diceType }}
+            </div>
+          </div>
+        </template>
       </div>
+
       
       <!-- Controls -->
       <div class="controls">
@@ -225,6 +298,12 @@ const performCheck = async () => {
             @click="currentCheckType = CHECK_TYPES.TALENT"
           >
             Talentprobe
+          </button>
+          <button
+            :class="{ active: currentCheckType === CHECK_TYPES.COMBAT }"
+            @click="currentCheckType = CHECK_TYPES.COMBAT"
+          >
+            Kampfprobe
           </button>
         </div>
         
@@ -247,6 +326,20 @@ const performCheck = async () => {
             placeholder="Talent aussuchen..."
           />
         </div>
+
+        <div v-if="currentCheckType === CHECK_TYPES.COMBAT" class="weapon-selection">
+          <SearchableDropdown
+            v-model="selectedWeapon"
+            :items="weapons"
+            :display-field="(item) => item.name"
+            :value-field="(item) => item.id"
+            placeholder="Waffe aussuchen..."
+          />
+          <div v-if="selectedWeapon" class="weapon-info">
+            <div>AT: {{ selectedWeapon.at + selectedWeapon.atBonus }}</div>
+            <div>Schaden: {{ selectedWeapon.tp.diceCount }}W{{ selectedWeapon.tp.diceType }}+{{ selectedWeapon.tp.modifier }}</div>
+          </div>
+        </div>
         
         <div class="modifier">
           <label for="modifier">Erleichterung/Erschwernis:</label>
@@ -258,7 +351,7 @@ const performCheck = async () => {
             Würfeln
           </button>
           <button 
-            v-if="currentCheckType === CHECK_TYPES.TALENT" 
+            v-if="currentCheckType === CHECK_TYPES.TALENT || (currentCheckType === CHECK_TYPES.COMBAT && showDamageRoll)" 
             class="camera-reset-button" 
             @click="resetAllCameras"
           >
@@ -278,17 +371,34 @@ const performCheck = async () => {
         </div>
         <div v-if="result.success" class="result-qs">QS {{ result.qualityLevel }}</div>
         <div class="result-line">Würfe: {{ result.rolls.join(', ') }}</div>
-        <div class="result-line">Benötigte Punkte: {{ result.pointsNeeded }}</div>
-        <div v-if="result.success" class="result-line">Übrige Punkte: {{ result.remainingPoints }}</div>
-        <div class="result-line">Modifikator: {{ result.modifier }}</div>
-        <div v-if="result.type === 'attribute'" class="result-line">
-          Zielwert: {{ result.target }} (Angepasst: {{ result.adjustedTarget }})
-        </div>
-        <div v-if="result.type === 'talent'" class="result-line">
-          <div v-for="attr in result.adjustedAttributes" :key="attr.name">
+        
+        <template v-if="result.type === 'attribute'">
+          <div class="result-line">Zielwert: {{ result.target }} (Angepasst: {{ result.adjustedTarget }})</div>
+          <div v-if="result.success" class="result-line">Übrige Punkte: {{ result.remainingPoints }}</div>
+        </template>
+        
+        <template v-else-if="result.type === 'talent'">
+          <div class="result-line">Benötigte Punkte: {{ result.pointsNeeded }}</div>
+          <div v-if="result.success" class="result-line">Übrige Punkte: {{ result.remainingPoints }}</div>
+          <div class="result-line" v-for="attr in result.adjustedAttributes" :key="attr.name">
             {{ attr.name }}: {{ attr.value }} (Angepasst: {{ attr.adjustedValue }})
           </div>
-        </div>
+        </template>
+        
+        <template v-else-if="result.type === 'combat'">
+          <div class="result-line">
+            <div>Waffe: {{ result.weapon }}</div>
+            <div>Angriffswert: {{ result.target }}</div>
+            <template v-if="result.success && result.damageRolls">
+              <div class="damage-result">
+                <div>Schaden: {{ result.totalDamage }}</div>
+                <div class="damage-rolls">({{ result.damageRolls.join(' + ') }})</div>
+              </div>
+            </template>
+          </div>
+        </template>
+        
+        <div class="result-line">Modifikator: {{ result.modifier }}</div>
       </div>
     </div>
     <div v-else class="no-character-selected">
@@ -315,13 +425,8 @@ const performCheck = async () => {
   gap: 1rem;
 }
 
-.dice-rollers {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  justify-content: center;
+.dice-roller {
   width: 100%;
-  max-width: 1000px;
 }
 
 .modifier {
@@ -339,53 +444,28 @@ const performCheck = async () => {
   border-radius: 4px;
 }
 
-.dice-views {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  justify-content: center;
+.dice-labels {
   width: 100%;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-.dice-roller {
-  width: 300px;
-  height: 300px;
-}
-
-.dice-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.single-dice-label {
   text-align: center;
-  color: #42b983;
-  text-shadow: #42b983 0 0 4px;
-  font-weight: bold;
-  font-size: 0.9rem;
-  margin: 0.5rem auto;
+  margin-bottom: 1rem;
 }
 
-.talent-dice-labels {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  padding: 0 1rem;
-  margin: 0.5rem auto;
-}
-
+.single-dice-label,
 .dice-label {
   text-align: center;
   color: #42b983;
   text-shadow: #42b983 0 0 4px;
   font-weight: bold;
   font-size: 0.9rem;
-  flex: 1;
-  margin: 0 0.5rem;
+  margin: 0.5rem auto;
+}
+
+.talent-dice-labels,
+.damage-dice-labels {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .controls {
@@ -401,7 +481,7 @@ const performCheck = async () => {
 .check-type {
   display: flex;
   gap: 0.5rem;
-  width: 26rem;
+  width: 100%;
 }
 
 .check-type button {
@@ -412,8 +492,10 @@ const performCheck = async () => {
   color: white;
   border-radius: 4px;
   cursor: pointer;
+  white-space: nowrap;
 }
-.selection, .talent-selection {
+
+.selection, .talent-selection, .weapon-selection {
   width: 100%;
 }
 
@@ -422,13 +504,13 @@ const performCheck = async () => {
   border-color: #42b983;
 }
 
-.selection select {
-  width: 100%;
-  padding: 0.5rem;
-  background: #333;
-  color: white;
-  border: 1px solid #444;
-  border-radius: 4px;
+.weapon-info {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  color: #42b983;
+  font-weight: bold;
+  margin-top: 0.5rem;
 }
 
 .button-group {
@@ -470,6 +552,18 @@ const performCheck = async () => {
 .result.fumble {
   background: #5a2a2a; 
   animation: glow 1s ease-in-out infinite alternate;
+}
+
+.damage-result {
+  margin-top: 0.5rem;
+  font-size: 1.2rem;
+  color: #ff6b6b;
+}
+
+.damage-rolls {
+  font-size: 0.9rem;
+  color: #999;
+  margin-top: 0.25rem;
 }
 
 @keyframes glow {
@@ -545,9 +639,8 @@ const performCheck = async () => {
 }
 
 @media (max-width: 960px) {
-  .dice-rollers {
+  .check-type {
     flex-direction: column;
-    align-items: center;
   }
   
   .dice-wrapper {

@@ -9,17 +9,16 @@ import { useSceneSystem } from '../composables/useSceneSystem'
 import { usePhysicsSystem } from '../composables/usePhysicsSystem'
 import { useAnimationSystem } from '../composables/useAnimationSystem'
 
-// Container refs
-const containerRef1 = ref(null)
-const containerRef2 = ref(null)
-const containerRef3 = ref(null)
-const containerRefs = [containerRef1, containerRef2, containerRef3]
-
 // Initialize composables
 const diceState = useDiceState()
 const sceneSystem = useSceneSystem()
 const physicsSystem = usePhysicsSystem()
 const animationSystem = useAnimationSystem()
+
+// Container refs management
+const containerElements = []
+const maxDiceCount = ref(1)
+const isInitialized = ref(false)
 
 // Camera manager ref
 let cameraManager = null
@@ -49,43 +48,24 @@ const animate = (currentTime) => {
     cameraManager
   )
   
-  // Camera updates based on dice state
-  if (diceState.dice.value.length === 0 && cameraManager) {
-    for (let i = 0; i < 3; i++) {
-      cameraManager.setMode('overview', i)
-    }
-  }
-  
   if (cameraManager) {
-  
-    // Update camera mode based on dice state
+    // Ensure we have enough cameras
+    cameraManager.ensureCameraCount(diceState.dice.value.length)
+    
+    // Update camera modes based on dice state
     diceState.rigidBodies.value.forEach((rb, index) => {
-  if (!rb) return
-  
-  const wasSettled = diceState.settledDice.value.has(index)
-  const isNowSettled = physicsSystem.isDiceSettled(rb)
-  
-  if (wasSettled !== isNowSettled) {
-    console.log(`Die ${index} settlement changed:`, {
-      wasSettled,
-      isNowSettled
-    })
-  }
-
-  if (isNowSettled) {
-    diceState.settledDice.value.add(index)
-    cameraManager.setMode('topdown', index)
-  } else {
-    cameraManager.setMode('following', index)
-  }
-})
-
-    // If no dice, set all cameras to overview
-    if (diceState.dice.value.length === 0) {
-      for (let i = 0; i < 3; i++) {
-        cameraManager.setMode('overview', i)
+      if (!rb) return
+      
+      const wasSettled = diceState.settledDice.value.has(index)
+      const isNowSettled = physicsSystem.isDiceSettled(rb)
+      
+      if (isNowSettled) {
+        diceState.settledDice.value.add(index)
+        cameraManager.setMode('topdown', index)
+      } else {
+        cameraManager.setMode('following', index)
       }
-    }
+    })
 
     // Update camera positions
     cameraManager.update(
@@ -95,38 +75,53 @@ const animate = (currentTime) => {
     )
   }
   
-  // Render with non-reactive access
-  const currentRenderers = [...diceState.renderers.value]
+  // Render with dynamic camera count
+  const currentRenderers = diceState.renderers.value
   const currentScene = sceneSystem.scene.value
   const cameras = cameraManager?.getCameras() || []
 
-  if (diceState.dice.value.length > 0) {
-    console.log('Dice rendering setup:', {
-      diceCount: diceState.dice.value.length,
-      renderersCount: currentRenderers.length,
-      camerasCount: cameras.length,
-      diceIndices: diceState.dice.value.map((_, i) => i)
-    })
-  }
-
   currentRenderers.forEach((renderer, index) => {
-    if (index === 0 || (diceState.showExtraViews.value && index < diceState.dice.value.length)) {
-      if (renderer && cameras[index] && currentScene) {
-        // Ensure each camera is looking at its corresponding die
-        const dieIndex = index  // This should match the die index
-        const die = diceState.dice.value[dieIndex]
-        if (die) {
+    if (index < diceState.dice.value.length && renderer && cameras[index]) {
+      if (index === 0 || diceState.showExtraViews.value) {
+        const die = diceState.dice.value[index]
+        if (die && currentScene) {
           renderer.render(currentScene, cameras[index])
         }
       }
     }
   })
-
 }
 
-// Roll dice function
+const initializeContainer = (el, index) => {
+  if (el && !containerElements[index]) {
+    containerElements[index] = el
+    
+    // Check if all required containers are ready
+    const allContainersReady = containerElements.length >= maxDiceCount.value &&
+      containerElements.every((container, idx) => idx >= maxDiceCount.value || container != null)
+    
+    if (allContainersReady && !isInitialized.value) {
+      diceState.setupViews(containerElements)
+      isInitialized.value = true
+    }
+  }
+}
+
 const rollDice = async (type, count) => {
   try {
+    if (count > maxDiceCount.value) {
+      maxDiceCount.value = count
+      isInitialized.value = false
+      // Clear existing renderers
+      diceState.renderers.value.forEach(renderer => {
+        if (renderer && renderer.domElement && renderer.domElement.parentNode) {
+          renderer.domElement.parentNode.removeChild(renderer.domElement)
+        }
+      })
+      // Wait for DOM update
+      await new Promise(resolve => setTimeout(resolve, 0))
+    }
+
     animationSystem.isRotating.value = false
     diceState.settledDice.value.clear()
     
@@ -135,15 +130,11 @@ const rollDice = async (type, count) => {
     
     if (cameraManager) {
       cameraManager.reset()
-      // Set initial mode for all cameras
       for (let i = 0; i < count; i++) {
         cameraManager.setMode('following', i)
       }
     }
-    console.log('Before creating dice:', {
-    existingDice: diceState.dice.value.length
-    })
-    // Create dice instances
+
     for (let i = 0; i < count; i++) {
       const { mesh, rigidBody } = diceState.createDiceInstance(
         type, i, count, sceneSystem.world.value
@@ -152,30 +143,25 @@ const rollDice = async (type, count) => {
       diceState.dice.value.push(mesh)         
       diceState.rigidBodies.value.push(rigidBody)
     }
-    console.log('After creating dice:', {
-    totalDice: diceState.dice.value.length
-    })
 
-    // Wait for dice to settle
     return new Promise((resolve, reject) => {
       const checkSettled = setInterval(() => {
-  try {
-    const allSettled = diceState.rigidBodies.value.every(rb => 
-      physicsSystem.isDiceSettled(rb)
-    )
-    if (allSettled) {
-      console.log('All dice settled in checkSettled interval') // Add this
-      clearInterval(checkSettled)
-      const results = diceState.dice.value.map(d => 
-        diceState.getUpFacingNumber(d)
-      )
-      resolve(results)
-    }
-  } catch (error) {
-    clearInterval(checkSettled)
-    reject(new Error('Error checking dice settlement: ' + error.message))
-  }
-}, 100)
+        try {
+          const allSettled = diceState.rigidBodies.value.every(rb => 
+            physicsSystem.isDiceSettled(rb)
+          )
+          if (allSettled) {
+            clearInterval(checkSettled)
+            const results = diceState.dice.value.map(d => 
+              diceState.getUpFacingNumber(d)
+            )
+            resolve(results)
+          }
+        } catch (error) {
+          clearInterval(checkSettled)
+          reject(new Error('Error checking dice settlement: ' + error.message))
+        }
+      }, 100)
     })
   } catch (error) {
     console.error('Error in rollDice:', error)
@@ -183,32 +169,27 @@ const rollDice = async (type, count) => {
   }
 }
 
-// Reset camera positions and state
 const resetCamera = () => {
   animationSystem.rotationAngle.value = 0
   animationSystem.isRotating.value = true
   
   if (cameraManager) {
     cameraManager.reset()
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < maxDiceCount.value; i++) {
       cameraManager.setMode('overview', i)
     }
   }
 }
 
-// Lifecycle hooks
 onMounted(async () => {
   try {
     await RAPIER.init()
     await sceneSystem.initScene()
-    diceState.setupViews(containerRefs)
     
     cameraManager = new CameraManager(sceneSystem.scene.value, 300, 300)
     physicsSystem.resetPhysicsState()
     
-    // Start animation using the animation system
     animationSystem.startAnimation(animate)
-
     window.addEventListener('keydown', handleKeydown)
   } catch (error) {
     console.error('Error in mounted hook:', error)
@@ -216,19 +197,23 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  // Stop animation using the animation system
   animationSystem.stopAnimation()
   window.removeEventListener('keydown', handleKeydown)
+  
+  // Cleanup renderers
+  diceState.renderers.value.forEach(renderer => {
+    if (renderer && renderer.domElement && renderer.domElement.parentNode) {
+      renderer.domElement.parentNode.removeChild(renderer.domElement)
+    }
+  })
 })
 
-// Event handlers
 const handleKeydown = (event) => {
   if (event.key.toLowerCase() === 'w') {
     sceneSystem.toggleWireframes()
   }
 }
 
-// Expose necessary methods
 defineExpose({
   rollDice,
   resetCamera,
@@ -237,18 +222,14 @@ defineExpose({
 </script>
 
 <template>
-  <div class="dice-views-container">
+  <div class="dice-views-container" :class="`dice-count-${maxDiceCount}`">
     <div class="dice-views">
-      <div ref="containerRef1" class="dice-container"></div>
       <div 
-        v-show="diceState.showExtraViews" 
-        ref="containerRef2" 
+        v-for="n in maxDiceCount"
+        :key="n"
+        :ref="el => initializeContainer(el, n - 1)"
         class="dice-container"
-      ></div>
-      <div 
-        v-show="diceState.showExtraViews" 
-        ref="containerRef3" 
-        class="dice-container"
+        v-show="n === 1 || (diceState.showExtraViews && n <= diceState.dice.value.length)"
       ></div>
     </div>
   </div>
@@ -257,15 +238,19 @@ defineExpose({
 <style scoped>
 .dice-views-container {
   width: 100%;
-  display: flex;
-  justify-content: center;
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;  /* Adjust based on your needs */
+  margin: 0 auto;
 }
 
 .dice-views {
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1rem;
   justify-content: center;
+  align-items: start;
+  padding: 1rem;
 }
 
 .dice-container {
@@ -274,19 +259,50 @@ defineExpose({
   background-color: #1a1a1a;
   border-radius: 8px;
   overflow: hidden;
+  justify-self: center;
 }
 
-@media (max-width: 960px) {
+
+.dice-count-1 .dice-views {
+  grid-template-columns: 300px;
+}
+
+.dice-count-2 .dice-views {
+  grid-template-columns: repeat(2, 300px);
+}
+
+.dice-count-3 .dice-views {
+  grid-template-columns: repeat(3, 300px);
+}
+
+.dice-count-4 .dice-views,
+.dice-count-5 .dice-views,
+.dice-count-6 .dice-views {
+  grid-template-columns: repeat(auto-fit, 300px);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+@media (max-width: 1200px) {
   .dice-views {
-    flex-direction: column;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .dice-container {
+    width: 250px;
+    height: 250px;
   }
 }
 
-.dice-label {
-  text-align: center;
-  margin-top: 0.5rem;
-  color: #42b983;
-  font-weight: bold;
-  font-size: 0.9rem;
+@media (max-width: 768px) {
+  .dice-views {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dice-container {
+    width: 200px;
+    height: 200px;
+  }
 }
 </style>

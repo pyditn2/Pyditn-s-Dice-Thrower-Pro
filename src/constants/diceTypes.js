@@ -14,6 +14,7 @@ export const DICE_TYPES = {
 export const CHECK_TYPES = {
   ATTRIBUTE: 'attribute',
   TALENT: 'talent',
+  COMBAT: 'combat',
   CUSTOM: 'custom'
 }
 
@@ -53,5 +54,10 @@ export const CHECK_CONFIGURATIONS = {
     diceCount: 3,
     diceType: DICE_TYPES.D20,
     label: 'Talentprobe'
+  },
+  [CHECK_TYPES.COMBAT]: {
+    diceCount: 1,
+    diceType: DICE_TYPES.D20,
+    label: 'Kampfprobe'
   }
 }
