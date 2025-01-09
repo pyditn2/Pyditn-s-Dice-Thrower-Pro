@@ -107,10 +107,11 @@ const checkCriticalRolls = (rolls) => {
 
 const rollDamage = async (weapon) => {
   const { diceCount, diceType, modifier } = weapon.tp
+  console.log("Starting damage roll for:", { diceCount, diceType, modifier });
   
-  // Force multiple dice views for damage roll
-  diceRoller1.value.updateViewMode(true)  // Enable multiple views
+  diceRoller1.value.updateViewMode(true)
   const rolls = await diceRoller1.value.rollDice(`d${diceType}`, diceCount)
+  console.log("Damage roll results:", rolls);
   const damage = rolls.reduce((sum, roll) => sum + roll, 0) + modifier
   
   result.value = {
@@ -118,10 +119,11 @@ const rollDamage = async (weapon) => {
     damageRolls: rolls,
     totalDamage: damage
   }
+  console.log("Updated result with damage:", result.value);
 }
 
 const performCheck = async () => {
-  console.log('performCheck called')
+  console.log('performCheck called', { currentCheckType: currentCheckType.value });
   if (!characterStore.activeCharacter) {
     alert('Bitte wählen Sie zuerst einen Charakter aus.')
     return
@@ -133,6 +135,7 @@ const performCheck = async () => {
     if (currentCheckType.value === CHECK_TYPES.ATTRIBUTE) {
       diceRoller1.value.updateViewMode(false)
       const roll = await diceRoller1.value.rollDice('d20', 1)
+      console.log("Attribute check roll result:", roll);
       const attributeValue = getAttributeValue(selectedAttribute.value)
       const adjustedAttributeValue = attributeValue + modifier.value
       
@@ -153,13 +156,17 @@ const performCheck = async () => {
         qualityLevel,
         critical: roll[0] === 1 ? 'Kritischer Erfolg!' : (roll[0] === 20 ? 'Patzer!' : null)
       }
+      console.log("Attribute check result set:", result.value);
+
     } else if (currentCheckType.value === CHECK_TYPES.TALENT) {
       const talent = selectedTalent.value
       if (!talent) return
 
       diceRoller1.value.updateViewMode(true)
       const rolls = await diceRoller1.value.rollDice('d20', 3)
+      console.log("Talent check roll results:", rolls);
       const flatRolls = rolls.flat()
+      console.log("Flattened talent rolls:", flatRolls);
       
       const criticalResult = checkCriticalRolls(flatRolls)
       
@@ -179,6 +186,7 @@ const performCheck = async () => {
           critical: criticalResult.message,
           modifier: modifier.value
         }
+        console.log("Talent check critical result set:", result.value);
       } else {
         let pointsNeeded = 0
         const adjustedAttributes = talent.attributes.map(attr => ({
@@ -208,6 +216,7 @@ const performCheck = async () => {
           adjustedAttributes,
           modifier: modifier.value
         }
+        console.log("Talent check normal result set:", result.value);
       }
     } else if (currentCheckType.value === CHECK_TYPES.COMBAT) {
       if (!selectedWeapon.value) {
@@ -215,10 +224,17 @@ const performCheck = async () => {
         return
       }
 
-      // Set to single view for attack roll
+      console.log("Starting combat check with weapon:", selectedWeapon.value);
       diceRoller1.value.updateViewMode(false)
       const roll = await diceRoller1.value.rollDice('d20', 1)
+      console.log("Combat attack roll result:", roll);
       const attackValue = selectedWeapon.value.at + selectedWeapon.value.atBonus + modifier.value
+      console.log("Attack value calculated:", { 
+        base: selectedWeapon.value.at, 
+        bonus: selectedWeapon.value.atBonus, 
+        modifier: modifier.value, 
+        total: attackValue 
+      });
       
       const success = roll[0] === 1 || (roll[0] <= attackValue && roll[0] !== 20)
       const remainingPoints = success ? attackValue - roll[0] : 0
@@ -234,6 +250,7 @@ const performCheck = async () => {
         qualityLevel,
         critical: roll[0] === 1 ? 'Kritischer Treffer!' : (roll[0] === 20 ? 'Patzer!' : null)
       }
+      console.log("Combat attack result set:", result.value);
 
       if (success) {
         showDamageRoll.value = true

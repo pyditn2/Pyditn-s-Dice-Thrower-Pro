@@ -112,13 +112,6 @@ const rollDice = async (type, count) => {
     if (count > maxDiceCount.value) {
       maxDiceCount.value = count
       isInitialized.value = false
-      // Clear existing renderers
-      diceState.renderers.value.forEach(renderer => {
-        if (renderer && renderer.domElement && renderer.domElement.parentNode) {
-          renderer.domElement.parentNode.removeChild(renderer.domElement)
-        }
-      })
-      // Wait for DOM update
       await new Promise(resolve => setTimeout(resolve, 0))
     }
 
@@ -144,6 +137,7 @@ const rollDice = async (type, count) => {
       diceState.rigidBodies.value.push(rigidBody)
     }
 
+    // Wait for dice to settle
     return new Promise((resolve, reject) => {
       const checkSettled = setInterval(() => {
         try {
@@ -152,9 +146,11 @@ const rollDice = async (type, count) => {
           )
           if (allSettled) {
             clearInterval(checkSettled)
-            const results = diceState.dice.value.map(d => 
-              diceState.getUpFacingNumber(d)
+            // Get results using DiceManager's getUpFacingNumber
+            const results = diceState.dice.value.map(die => 
+              diceState.diceManager.getUpFacingNumber(die)
             )
+            console.log("Settled dice results:", results) // Debug log
             resolve(results)
           }
         } catch (error) {

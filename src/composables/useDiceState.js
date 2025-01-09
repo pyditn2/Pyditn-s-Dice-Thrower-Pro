@@ -12,7 +12,7 @@ export const useDiceState = () => {
   // Camera and renderer configuration
   const renderers = ref([])
   const showExtraViews = ref(false)
-  const currentContainers = ref([])  // Keep track of current containers
+  const currentContainers = ref([])
   
   // Compute number of views needed based on dice count
   const requiredViews = computed(() => 
@@ -72,6 +72,7 @@ export const useDiceState = () => {
         z: Math.random() - 0.5
       }
 
+      // Use DiceManager to create the dice
       const { mesh, rigidBody } = diceManager.createDice(type, world)
       
       mesh.position.set(offset.x, offset.y, offset.z)
@@ -141,12 +142,12 @@ export const useDiceState = () => {
     settledDice,
     renderers,
     showExtraViews,
-    requiredViews,
     resetDice,
     createDiceInstance,
     setupViews,
     updateViewMode,
     getUpFacingNumber,
-    updateDicePhysics
+    updateDicePhysics,
+    diceManager
   }
 }
