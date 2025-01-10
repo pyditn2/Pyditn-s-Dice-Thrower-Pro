@@ -167,9 +167,6 @@ const updateTpField = (weaponId, field, value) => {
 </template>
 
 <style scoped>
-.weapons-section {
-  margin-top: 1rem;
-}
 
 .section-header {
   display: flex;

@@ -65,9 +65,11 @@ const deleteCurrentCharacter = () => {
 }
 </script>
 
+Here's the complete template section for CharacterEditor.vue that you can directly copy and paste:
+
+```vue
 <template>
   <div class="character-editor">
-
     <div v-if="characterStore.activeCharacter" class="editor-layout">
       <!-- Character Info Sidebar -->
       <div class="character-info-sidebar">
@@ -116,61 +118,67 @@ const deleteCurrentCharacter = () => {
         </div>
       </div>
 
-      <!-- Main Content -->
-      <div class="main-content">
-        <!-- Attributes Section -->
-        <div class="section">
-          <h3>Eigenschaften</h3>
-          <div class="attributes-grid">
-            <div v-for="(value, key) in characterStore.activeCharacter.stats.attributes" 
-                 :key="key" 
-                 class="attribute-item">
-              <label :for="key">{{ attributeNames[key] }}</label>
-              <input 
-                :id="key"
-                type="number" 
-                :value="value"
-                min="0"
-                max="20"
-                @input="(e) => updateAttribute(key, e.target.value)"
-              >
-            </div>
-          </div>
-        </div>
-        
-        <!-- Talents Section -->
-        <div class="section">
-          <h3>Talente</h3>
-          <div v-for="(talents, categoryKey, index) in characterStore.activeCharacter.talents"
-               :key="categoryKey" 
-               class="talent-category">
-            <h4
-                :style="{ marginTop: index === 0 ? '0rem' : '' }"
-                class="category-name">
-              {{ categoryNames[categoryKey] }}
-            </h4>
-            <div class="talents-grid">
-              <div v-for="(talent, index) in talents" 
-                   :key="talent.name" 
-                   class="talent-item">
-                <div class="talent-name">
-                  {{ talent.name }}
-                  <div class="talent-attributes">
-                    ({{ talent.attributes.join(', ') }})
-                  </div>
-                </div>
+      <!-- Main Layout -->
+      <div class="main-layout">
+        <div class="main-content">
+          <!-- Attributes Section -->
+          <div class="section">
+            <h3>Eigenschaften</h3>
+            <div class="attributes-grid">
+              <div v-for="(value, key) in characterStore.activeCharacter.stats.attributes" 
+                   :key="key" 
+                   class="attribute-item">
+                <label :for="key">{{ attributeNames[key] }}</label>
                 <input 
+                  :id="key"
                   type="number" 
-                  :value="talent.value"
+                  :value="value"
                   min="0"
                   max="20"
-                  @input="(e) => updateTalent(categoryKey, index, e.target.value)"
+                  @input="(e) => updateAttribute(key, e.target.value)"
                 >
               </div>
             </div>
           </div>
+          
+          <!-- Talents Section -->
+          <div class="section">
+            <h3>Talente</h3>
+            <div v-for="(talents, categoryKey, index) in characterStore.activeCharacter.talents"
+                 :key="categoryKey" 
+                 class="talent-category">
+              <h4
+                  :style="{ marginTop: index === 0 ? '0rem' : '' }"
+                  class="category-name">
+                {{ categoryNames[categoryKey] }}
+              </h4>
+              <div class="talents-grid">
+                <div v-for="(talent, index) in talents" 
+                     :key="talent.name" 
+                     class="talent-item">
+                  <div class="talent-name">
+                    {{ talent.name }}
+                    <div class="talent-attributes">
+                      ({{ talent.attributes.join(', ') }})
+                    </div>
+                  </div>
+                  <input 
+                    type="number" 
+                    :value="talent.value"
+                    min="0"
+                    max="20"
+                    @input="(e) => updateTalent(categoryKey, index, e.target.value)"
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <WeaponsSection />
+
+        <!-- Weapons Content -->
+        <div class="weapons-content">
+          <WeaponsSection />
+        </div>
       </div>
     </div>
     
@@ -179,6 +187,7 @@ const deleteCurrentCharacter = () => {
     </div>
   </div>
 </template>
+```
 
 <style scoped>
 .character-editor {
@@ -230,8 +239,10 @@ const deleteCurrentCharacter = () => {
   border-color: #42b983;
 }
 
+
 .main-content {
-  flex-grow: 1;
+  flex: 1;
+  min-width: 0;
 }
 
 .section {
@@ -243,7 +254,7 @@ const deleteCurrentCharacter = () => {
 
 .attributes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
 }
 
@@ -262,7 +273,7 @@ const deleteCurrentCharacter = () => {
 
 .talents-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.75rem;
 }
 
@@ -318,6 +329,22 @@ input[type="number"]::-webkit-outer-spin-button {
   color: #999;
 }
 
+@media (max-width: 1400px) {
+  .main-layout {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .weapons-content {
+    width: 100%;
+  }
+
+  .attributes-grid,
+  .talents-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
 @media (max-width: 1024px) {
   .editor-layout {
     flex-direction: column;
@@ -351,5 +378,44 @@ input[type="number"]::-webkit-outer-spin-button {
     width: -webkit-fill-available;
     width: fill-available;
   }
+}
+
+@media (max-width: 1024px) {
+  .editor-layout {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .main-layout {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .weapons-content {
+    width: 100%;
+  }
+
+  .character-info-sidebar, .info-field, .info-field input {
+    width: 100%;
+    width: -moz-available;
+    width: -webkit-fill-available;
+    width: fill-available;
+  }
+}
+
+.main-layout {
+  flex-grow: 1;
+  display: flex;
+  gap: 2rem;
+}
+
+.stats-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.weapons-content {
+  width: 350px;
+  flex-shrink: 0;
 }
 </style>
