@@ -15,6 +15,17 @@ const selectedTalentId = ref(null)
 const selectedWeaponId = ref(null)
 const showDamageRoll = ref(false)
 
+const tempATBonus = ref(0)
+const tempDamageBonus = ref(0)
+const criticalDamage = ref(null)
+const extraD6Result = ref(null)
+
+const rollExtraD6 = async () => {
+  diceRoller1.value.updateViewMode(false)
+  const roll = await diceRoller1.value.rollDice('d6', 1)
+  extraD6Result.value = roll[0]
+}
+
 const selectedTalent = computed({
   get: () => {
     if (selectedTalentId.value === null && talents.value.length > 0) {
@@ -117,9 +128,16 @@ const rollDamage = async (weapon) => {
   result.value = {
     ...result.value,
     damageRolls: rolls,
-    totalDamage: damage
+    totalDamage: damage,
+    damageModifier: modifier
   }
   console.log("Updated result with damage:", result.value);
+}
+
+const rollCriticalDamage = async () => {
+  diceRoller1.value.updateViewMode(false)
+  const roll = await diceRoller1.value.rollDice('d6', 1)
+  criticalDamage.value = roll[0]
 }
 
 const performCheck = async () => {
@@ -219,44 +237,40 @@ const performCheck = async () => {
         console.log("Talent check normal result set:", result.value);
       }
     } else if (currentCheckType.value === CHECK_TYPES.COMBAT) {
-      if (!selectedWeapon.value) {
-        alert('Bitte wählen Sie eine Waffe aus.')
-        return
-      }
+  if (!selectedWeapon.value) {
+    alert('Bitte wählen Sie eine Waffe aus.')
+    return
+  }
 
-      console.log("Starting combat check with weapon:", selectedWeapon.value);
-      diceRoller1.value.updateViewMode(false)
-      const roll = await diceRoller1.value.rollDice('d20', 1)
-      console.log("Combat attack roll result:", roll);
-      const attackValue = selectedWeapon.value.at + selectedWeapon.value.atBonus + modifier.value
-      console.log("Attack value calculated:", { 
-        base: selectedWeapon.value.at, 
-        bonus: selectedWeapon.value.atBonus, 
-        modifier: modifier.value, 
-        total: attackValue 
-      });
-      
-      const success = roll[0] === 1 || (roll[0] <= attackValue && roll[0] !== 20)
-      const remainingPoints = success ? attackValue - roll[0] : 0
-      const qualityLevel = success ? calculateQS(remainingPoints) : 0
-      
-      result.value = {
-        type: 'combat',
-        weapon: selectedWeapon.value.name,
-        rolls: [roll[0]],
-        target: attackValue,
-        success,
-        remainingPoints,
-        qualityLevel,
-        critical: roll[0] === 1 ? 'Kritischer Treffer!' : (roll[0] === 20 ? 'Patzer!' : null)
-      }
-      console.log("Combat attack result set:", result.value);
+  diceRoller1.value.updateViewMode(false)
+  const roll = await diceRoller1.value.rollDice('d20', 1)
+  const baseAttackValue = selectedWeapon.value.at + selectedWeapon.value.atBonus
+  const tempBonus = tempATBonus.value || 0
+  const attackValue = baseAttackValue + tempBonus + modifier.value
+  
+  const success = roll[0] === 1 || (roll[0] <= attackValue && roll[0] !== 20)
+  const remainingPoints = success ? attackValue - roll[0] : 0
+  const qualityLevel = success ? calculateQS(remainingPoints) : 0
+  
+  result.value = {
+    type: 'combat',
+    weapon: selectedWeapon.value.name,
+    rolls: [roll[0]],
+    baseTarget: baseAttackValue,
+    tempATBonus: tempBonus,
+    target: attackValue,
+    success,
+    remainingPoints,
+    qualityLevel,
+    critical: roll[0] === 1 ? 'Kritischer Treffer!' : (roll[0] === 20 ? 'Patzer!' : null)
+  }
 
-      if (success) {
-        showDamageRoll.value = true
-        await rollDamage(selectedWeapon.value)
-      }
-    }
+  if (success) {
+    showDamageRoll.value = true
+  }
+
+
+}
   } catch (error) {
     console.error('Error during check:', error)
   }
@@ -300,82 +314,102 @@ const performCheck = async () => {
         </template>
       </div>
 
-      
       <!-- Controls -->
-      <div class="controls">
-        <div class="check-type">
-          <button 
-            :class="{ active: currentCheckType === CHECK_TYPES.ATTRIBUTE }"
-            @click="currentCheckType = CHECK_TYPES.ATTRIBUTE"
-          >
-            Eigenschaftsprobe
-          </button>
-          <button 
-            :class="{ active: currentCheckType === CHECK_TYPES.TALENT }"
-            @click="currentCheckType = CHECK_TYPES.TALENT"
-          >
-            Talentprobe
-          </button>
-          <button
-            :class="{ active: currentCheckType === CHECK_TYPES.COMBAT }"
-            @click="currentCheckType = CHECK_TYPES.COMBAT"
-          >
-            Kampfprobe
-          </button>
-        </div>
-        
-        <div class="selection" v-if="currentCheckType === CHECK_TYPES.ATTRIBUTE">
-          <SearchableDropdown
-            v-model="selectedAttributeObject"
-            :items="attributes"
-            :display-field="(item) => item.name"
-            :value-field="(item) => item.value"
-            placeholder="Attribut aussuchen..."
-          />
-        </div>
-        
-        <div v-if="currentCheckType === CHECK_TYPES.TALENT" class="talent-selection">
-          <SearchableDropdown
-            v-model="selectedTalent"
-            :items="talents"
-            :display-field="(item) => item.name"
-            :value-field="(item) => item.value"
-            placeholder="Talent aussuchen..."
-          />
-        </div>
+<div class="controls">
+  <div class="check-type">
+    <button 
+      :class="{ active: currentCheckType === CHECK_TYPES.ATTRIBUTE }"
+      @click="currentCheckType = CHECK_TYPES.ATTRIBUTE"
+    >
+      Eigenschaftsprobe
+    </button>
+    <button 
+      :class="{ active: currentCheckType === CHECK_TYPES.TALENT }"
+      @click="currentCheckType = CHECK_TYPES.TALENT"
+    >
+      Talentprobe
+    </button>
+    <button
+      :class="{ active: currentCheckType === CHECK_TYPES.COMBAT }"
+      @click="currentCheckType = CHECK_TYPES.COMBAT"
+    >
+      Kampfprobe
+    </button>
+  </div>
+  
+  <div class="selection" v-if="currentCheckType === CHECK_TYPES.ATTRIBUTE">
+    <SearchableDropdown
+      v-model="selectedAttributeObject"
+      :items="attributes"
+      :display-field="(item) => item.name"
+      :value-field="(item) => item.value"
+      placeholder="Attribut aussuchen..."
+    />
+  </div>
+  
+  <div v-if="currentCheckType === CHECK_TYPES.TALENT" class="talent-selection">
+    <SearchableDropdown
+      v-model="selectedTalent"
+      :items="talents"
+      :display-field="(item) => item.name"
+      :value-field="(item) => item.value"
+      placeholder="Talent aussuchen..."
+    />
+  </div>
 
-        <div v-if="currentCheckType === CHECK_TYPES.COMBAT" class="weapon-selection">
-          <SearchableDropdown
-            v-model="selectedWeapon"
-            :items="weapons"
-            :display-field="(item) => item.name"
-            :value-field="(item) => item.id"
-            placeholder="Waffe aussuchen..."
-          />
-          <div v-if="selectedWeapon" class="weapon-info">
-            <div>AT: {{ selectedWeapon.at + selectedWeapon.atBonus }}</div>
-            <div>Schaden: {{ selectedWeapon.tp.diceCount }}W{{ selectedWeapon.tp.diceType }}+{{ selectedWeapon.tp.modifier }}</div>
-          </div>
-        </div>
-        
-        <div class="modifier">
-          <label for="modifier">Erleichterung/Erschwernis:</label>
-          <input id="modifier" type="number" v-model.number="modifier" />
-        </div>
-        
-        <div class="button-group">
-          <button class="roll-button" @click="performCheck">
-            Würfeln
-          </button>
-          <button 
-            v-if="currentCheckType === CHECK_TYPES.TALENT || (currentCheckType === CHECK_TYPES.COMBAT && showDamageRoll)" 
-            class="camera-reset-button" 
-            @click="resetAllCameras"
-          >
-            🎲
-          </button>
-        </div>
+  <div v-if="currentCheckType === CHECK_TYPES.COMBAT" class="weapon-selection">
+    <SearchableDropdown
+      v-model="selectedWeapon"
+      :items="weapons"
+      :display-field="(item) => item.name"
+      :value-field="(item) => item.id"
+      placeholder="Waffe aussuchen..."
+    />
+    
+    <div v-if="selectedWeapon" class="weapon-info">
+      <div>AT: {{ selectedWeapon.at + selectedWeapon.atBonus }}</div>
+      <div>Schaden: {{ selectedWeapon.tp.diceCount }}W{{ selectedWeapon.tp.diceType }}+{{ selectedWeapon.tp.modifier }}</div>
+    </div>
+
+    <!-- Temporary bonus section -->
+    <div class="temp-bonuses">
+      <div class="bonus-input">
+        <label for="tempAT">Temporärer AT Bonus:</label>
+        <input 
+          id="tempAT" 
+          type="number" 
+          v-model.number="tempATBonus"
+          class="bonus-number"
+        />
       </div>
+    </div>
+  </div>
+  
+  <div class="modifier">
+    <label for="modifier">Erleichterung/Erschwernis:</label>
+    <input id="modifier" type="number" v-model.number="modifier" />
+  </div>
+  
+  <div class="button-group">
+    <button class="roll-button" @click="performCheck">
+      Würfeln
+    </button>
+    <button 
+      v-if="currentCheckType === CHECK_TYPES.COMBAT"
+      class="w6-button"
+      @click="rollExtraD6"
+    >
+      W6
+    </button>
+    <button 
+      v-if="currentCheckType === CHECK_TYPES.TALENT || (currentCheckType === CHECK_TYPES.COMBAT && showDamageRoll)" 
+      class="camera-reset-button" 
+      @click="resetAllCameras"
+    >
+      🎲
+    </button>
+  </div>
+</div>
       
       <!-- Result display -->
       <div v-if="result" class="result" :class="{ 
@@ -403,19 +437,53 @@ const performCheck = async () => {
         </template>
         
         <template v-else-if="result.type === 'combat'">
-          <div class="result-line">
-            <div>Waffe: {{ result.weapon }}</div>
-            <div>Angriffswert: {{ result.target }}</div>
-            <template v-if="result.success && result.damageRolls">
-              <div class="damage-result">
+  <div class="result-line">
+    <div>Waffe: {{ result.weapon }}</div>
+    <div>Angriffswert: {{ result.baseTarget }} 
+      {{ result.tempATBonus ? ` + ${result.tempATBonus}` : '' }}
+      {{ result.modifier ? ` + ${result.modifier} (Mod)` : '' }} 
+      = {{ result.target }}
+    </div>
+            
+            <template v-if="result.success">
+              <!-- Show damage roll button if attack was successful and damage hasn't been rolled yet -->
+              <div v-if="!result.damageRolls" class="damage-roll-section">
+                <button class="damage-roll-button" @click="rollDamage(selectedWeapon)">
+                  Schaden würfeln
+                </button>
+              </div>
+              <!-- Show damage results only after they've been rolled -->
+              <div v-else class="damage-result">
                 <div>Schaden: {{ result.totalDamage }}</div>
-                <div class="damage-rolls">({{ result.damageRolls.join(' + ') }})</div>
+                <div class="damage-rolls">
+                  ({{ result.damageRolls.join(' + ') }})
+                  {{ result.damageModifier ? ' + ' + result.damageModifier : '' }}
+                  {{ result.tempDamageBonus ? ' + ' + result.tempDamageBonus : '' }}
+                </div>
+              </div>
+            </template>
+
+            <!-- Critical damage section -->
+            <template v-if="result.critical && result.critical.includes('Kritischer')">
+              <div class="critical-damage-section">
+                <div v-if="!criticalDamage">
+                  <button class="critical-roll-button" @click="rollCriticalDamage">
+                    Kritischen Schaden würfeln
+                  </button>
+                </div>
+                <div v-else class="critical-damage-result">
+                  Kritischer Schaden: {{ criticalDamage }}
+                </div>
               </div>
             </template>
           </div>
+
+          <div class="result-line">
+            <div>Modifikator: {{ result.modifier }}</div>
+            <div v-if="result.tempATBonus">Temporärer AT Bonus: {{ result.tempATBonus }}</div>
+            <div v-if="result.tempDamageBonus">Temporärer Schaden Bonus: {{ result.tempDamageBonus }}</div>
+          </div>
         </template>
-        
-        <div class="result-line">Modifikator: {{ result.modifier }}</div>
       </div>
     </div>
     <div v-else class="no-character-selected">
@@ -425,6 +493,47 @@ const performCheck = async () => {
 </template>
 
 <style scoped>
+
+.d6-roll-section {
+  margin-top: 0.5rem;
+}
+
+.d6-roll-button {
+  background: #42b983;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.d6-roll-button:hover {
+  background: #3aa876;
+}
+
+.extra-d6-result {
+  margin-top: 0.5rem;
+  font-weight: bold;
+  color: #42b983;
+}
+
+.damage-roll-button {
+  background: #42b983;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.damage-roll-button:hover {
+  background: #3aa876;
+}
+
 .no-character-selected {
   text-align: center;
   padding: 2rem;
