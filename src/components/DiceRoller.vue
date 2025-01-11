@@ -32,33 +32,33 @@ const animate = (currentTime) => {
 
   const deltaTime = Math.min((currentTime - physicsSystem.lastTime.value) / 1000, 0.1)
   physicsSystem.lastTime.value = currentTime
-  
+
   // Physics update cycle
   physicsSystem.storePhysicsState(diceState.rigidBodies.value)
   const alpha = physicsSystem.updatePhysics(sceneSystem.world.value, deltaTime)
   physicsSystem.updateCurrentState(diceState.rigidBodies.value)
   physicsSystem.interpolateVisualState(diceState.dice.value, alpha)
-  
+
   // Update scene state
   animationSystem.updateRotation(deltaTime)
   diceState.updateDicePhysics(
-    diceState.rigidBodies.value, 
-    diceState.dice.value, 
-    diceState.settledDice.value, 
+    diceState.rigidBodies.value,
+    diceState.dice.value,
+    diceState.settledDice.value,
     cameraManager
   )
-  
+
   if (cameraManager) {
     // Ensure we have enough cameras
     cameraManager.ensureCameraCount(diceState.dice.value.length)
-    
+
     // Update camera modes based on dice state
     diceState.rigidBodies.value.forEach((rb, index) => {
       if (!rb) return
-      
+
       const wasSettled = diceState.settledDice.value.has(index)
       const isNowSettled = physicsSystem.isDiceSettled(rb)
-      
+
       if (isNowSettled) {
         diceState.settledDice.value.add(index)
         cameraManager.setMode('topdown', index)
@@ -69,12 +69,12 @@ const animate = (currentTime) => {
 
     // Update camera positions
     cameraManager.update(
-      diceState.dice.value, 
-      diceState.settledDice.value, 
+      diceState.dice.value,
+      diceState.settledDice.value,
       animationSystem.rotationAngle.value
     )
   }
-  
+
   // Render with dynamic camera count
   const currentRenderers = diceState.renderers.value
   const currentScene = sceneSystem.scene.value
@@ -95,11 +95,11 @@ const animate = (currentTime) => {
 const initializeContainer = (el, index) => {
   if (el && !containerElements[index]) {
     containerElements[index] = el
-    
+
     // Check if all required containers are ready
     const allContainersReady = containerElements.length >= maxDiceCount.value &&
       containerElements.every((container, idx) => idx >= maxDiceCount.value || container != null)
-    
+
     if (allContainersReady && !isInitialized.value) {
       diceState.setupViews(containerElements)
       isInitialized.value = true
@@ -117,10 +117,10 @@ const rollDice = async (type, count) => {
 
     animationSystem.isRotating.value = false
     diceState.settledDice.value.clear()
-    
+
     sceneSystem.cleanupScene()
-    diceState.resetDice()   
-    
+    diceState.resetDice()
+
     if (cameraManager) {
       cameraManager.reset()
       for (let i = 0; i < count; i++) {
@@ -133,7 +133,7 @@ const rollDice = async (type, count) => {
         type, i, count, sceneSystem.world.value
       )
       sceneSystem.scene.value.add(mesh)
-      diceState.dice.value.push(mesh)         
+      diceState.dice.value.push(mesh)
       diceState.rigidBodies.value.push(rigidBody)
     }
 
@@ -141,13 +141,13 @@ const rollDice = async (type, count) => {
     return new Promise((resolve, reject) => {
       const checkSettled = setInterval(() => {
         try {
-          const allSettled = diceState.rigidBodies.value.every(rb => 
+          const allSettled = diceState.rigidBodies.value.every(rb =>
             physicsSystem.isDiceSettled(rb)
           )
           if (allSettled) {
             clearInterval(checkSettled)
             // Get results using DiceManager's getUpFacingNumber
-            const results = diceState.dice.value.map(die => 
+            const results = diceState.dice.value.map(die =>
               diceState.diceManager.getUpFacingNumber(die)
             )
             console.log("Settled dice results:", results) // Debug log
@@ -168,7 +168,7 @@ const rollDice = async (type, count) => {
 const resetCamera = () => {
   animationSystem.rotationAngle.value = 0
   animationSystem.isRotating.value = true
-  
+
   if (cameraManager) {
     cameraManager.reset()
     for (let i = 0; i < maxDiceCount.value; i++) {
@@ -181,10 +181,10 @@ onMounted(async () => {
   try {
     await RAPIER.init()
     await sceneSystem.initScene()
-    
+
     cameraManager = new CameraManager(sceneSystem.scene.value, 300, 300)
     physicsSystem.resetPhysicsState()
-    
+
     animationSystem.startAnimation(animate)
     window.addEventListener('keydown', handleKeydown)
   } catch (error) {
@@ -195,7 +195,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   animationSystem.stopAnimation()
   window.removeEventListener('keydown', handleKeydown)
-  
+
   // Cleanup renderers
   diceState.renderers.value.forEach(renderer => {
     if (renderer && renderer.domElement && renderer.domElement.parentNode) {
@@ -220,13 +220,8 @@ defineExpose({
 <template>
   <div class="dice-views-container" :class="`dice-count-${maxDiceCount}`">
     <div class="dice-views">
-      <div 
-        v-for="n in maxDiceCount"
-        :key="n"
-        :ref="el => initializeContainer(el, n - 1)"
-        class="dice-container"
-        v-show="n === 1 || (diceState.showExtraViews && n <= diceState.dice.value.length)"
-      ></div>
+      <div v-for="n in maxDiceCount" :key="n" :ref="el => initializeContainer(el, n - 1)" class="dice-container"
+        v-show="n === 1 || (diceState.showExtraViews && n <= diceState.dice.value.length)"></div>
     </div>
   </div>
 </template>
@@ -236,7 +231,8 @@ defineExpose({
   width: 100%;
   position: relative;
   z-index: 1;
-  max-width: 1200px;  /* Adjust based on your needs */
+  max-width: 1200px;
+  /* Adjust based on your needs */
   margin: 0 auto;
 }
 
