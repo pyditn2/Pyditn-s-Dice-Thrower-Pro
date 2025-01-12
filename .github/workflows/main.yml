@@ -94,6 +94,7 @@ jobs:
 
       - name: Generate Changelog
         id: changelog
+        shell: bash
         run: |
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           echo "Latest tag: $LATEST_TAG"
