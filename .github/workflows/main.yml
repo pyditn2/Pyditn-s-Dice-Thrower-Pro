@@ -33,15 +33,11 @@ jobs:
         run: |
           npm version ${{ steps.version.outputs.version }} --no-git-tag-version
 
-      - name: Update Cargo.toml version
-        run: |
-          sed -i "s/^version = \".*\"/version = \"${{ steps.version.outputs.version }}\"/" src-tauri/Cargo.toml
-
       - name: Commit and push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add package.json src-tauri/Cargo.toml
+          git add package.json
           git commit -m "Bump version to ${{ steps.version.outputs.version }}"
           git push
 
@@ -114,6 +110,7 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_APP_VERSION: ${{ needs.bump-version.outputs.new_version }}
         with:
           tagName: v${{ needs.bump-version.outputs.new_version }}
           releaseName: 'PDTP v${{ needs.bump-version.outputs.new_version }}'
