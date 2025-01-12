@@ -33,11 +33,15 @@ jobs:
         run: |
           npm version ${{ steps.version.outputs.version }} --no-git-tag-version
 
+      - name: Update Cargo.toml version
+        run: |
+          sed -i "s/^version = \".*\"/version = \"${{ steps.version.outputs.version }}\"/" src-tauri/Cargo.toml
+
       - name: Commit and push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add package.json
+          git add package.json src-tauri/Cargo.toml
           git commit -m "Bump version to ${{ steps.version.outputs.version }}"
           git push
 
@@ -60,7 +64,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main # Make sure we get the updated package.json
+          ref: main
+          fetch-depth: 0
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -87,13 +92,37 @@ jobs:
       - name: install frontend dependencies
         run: npm install
 
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "Latest tag: $LATEST_TAG"
+          
+          if [ -z "$LATEST_TAG" ]; then
+            CHANGES=$(git log --pretty=format:"* %s (#%h)" --reverse)
+          else
+            CHANGES=$(git log ${LATEST_TAG}..HEAD --pretty=format:"* %s (#%h)" --reverse)
+          fi
+          
+          # Properly handle multiline output for GitHub Actions
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "changes<<$EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGES" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: v${{ needs.bump-version.outputs.new_version }}
           releaseName: 'PDTP v${{ needs.bump-version.outputs.new_version }}'
-          releaseBody: 'See the assets to download this version and install.'
+          releaseBody: |
+            PDTP v${{ needs.bump-version.outputs.new_version }}
+            
+            Changes in this release:
+            ${{ steps.changelog.outputs.changes }}
+            
+            See the assets to download this version and install.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
