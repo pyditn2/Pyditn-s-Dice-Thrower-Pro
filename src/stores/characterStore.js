@@ -47,7 +47,7 @@ export const useCharacterStore = defineStore('character', {
         { name: 'Einschüchtern', value: 0, attributes: ['MU', 'IN', 'CH'] },
         { name: 'Etikette', value: 0, attributes: ['KL', 'IN', 'CH'] },
         { name: 'Gassenwissen', value: 0, attributes: ['KL', 'IN', 'CH'] },
-        { name: 'Menschkenntnis', value: 0, attributes: ['KL', 'IN', 'CH'] },
+        { name: 'Menschenkenntnis', value: 0, attributes: ['KL', 'IN', 'CH'] },
         { name: 'Überreden', value: 0, attributes: ['MU', 'IN', 'CH'] },
         { name: 'Verkleiden', value: 0, attributes: ['IN', 'CH', 'GE'] },
         { name: 'Willenskraft', value: 0, attributes: ['MU', 'IN', 'CH'] }
@@ -129,23 +129,39 @@ export const useCharacterStore = defineStore('character', {
 
   actions: {
     initializeStore() {
-      // Check if there's existing data in the old format
-      const existingData = JSON.parse(localStorage.getItem('character'))
-      
+      // Retrieve the existing data from localStorage
+      const existingData = JSON.parse(localStorage.getItem('character'));
+    
       // Only initialize if characters object is empty
       if (existingData && Object.keys(this.characters).length === 0) {
         // Create first character from existing data
-        const firstCharId = '1'
-        this.characters[firstCharId] = {
-          characterInfo: existingData.characterInfo || {},
-          stats: existingData.stats || {},
-          talents: existingData.talents || {},
-          weapons: []
+        const firstCharId = '1';
+        
+        // Deep clone the existing data to avoid reference issues
+        const correctedData = JSON.parse(JSON.stringify(existingData));
+        
+        // Apply the correction to both the store data and localStorage
+        if (correctedData.talents && correctedData.talents.gesellschaftstalente) {
+          correctedData.talents.gesellschaftstalente = correctedData.talents.gesellschaftstalente.map(talent => ({
+            ...talent,
+            name: talent.name === 'Menschkenntnis' ? 'Menschenkenntnis' : talent.name
+          }));
         }
         
+        // Update localStorage with corrected data
+        localStorage.setItem('character', JSON.stringify(correctedData));
+        
+        // Initialize the store with corrected data
+        this.characters[firstCharId] = {
+          characterInfo: correctedData.characterInfo || {},
+          stats: correctedData.stats || {},
+          talents: correctedData.talents || {},
+          weapons: correctedData.weapons || []
+        };
+    
         // Only set activeCharacterId if none is currently selected
         if (!this.activeCharacterId) {
-          this.activeCharacterId = firstCharId
+          this.activeCharacterId = firstCharId;
         }
       }
     },
@@ -242,7 +258,7 @@ export const useCharacterStore = defineStore('character', {
             { name: 'Einschüchtern', value: 0, attributes: ['MU', 'IN', 'CH'] },
             { name: 'Etikette', value: 0, attributes: ['KL', 'IN', 'CH'] },
             { name: 'Gassenwissen', value: 0, attributes: ['KL', 'IN', 'CH'] },
-            { name: 'Menschkenntnis', value: 0, attributes: ['KL', 'IN', 'CH'] },
+            { name: 'Menschenkenntnis', value: 0, attributes: ['KL', 'IN', 'CH'] },
             { name: 'Überreden', value: 0, attributes: ['MU', 'IN', 'CH'] },
             { name: 'Verkleiden', value: 0, attributes: ['IN', 'CH', 'GE'] },
             { name: 'Willenskraft', value: 0, attributes: ['MU', 'IN', 'CH'] }
