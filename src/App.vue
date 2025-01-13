@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core"
 import DiceCheck from './components/DiceCheck.vue'
 import CharacterEditor from './components/CharacterEditor.vue'
 import CharacterSelector from "./components/CharacterSelector.vue";
+import OptionsMenu from './components/OptionsMenu.vue'
 
 const activeTab = ref('dice')
 </script>
@@ -35,6 +36,7 @@ const activeTab = ref('dice')
       <CharacterEditor v-if="activeTab === 'character'" />
     </div>
   </div>
+  <OptionsMenu />
 </template>
 
 <style>

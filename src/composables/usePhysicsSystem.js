@@ -1,14 +1,15 @@
 import { ref } from 'vue'
 import * as THREE from 'three'
 import { SETTLE_THRESHOLD } from '../constants/diceTypes'
+import { usePhysicsStore } from '../stores/physicsStore'
 
 export const usePhysicsSystem = () => {
+  const physicsStore = usePhysicsStore()
   const previousState = ref(new Map())
   const currentState = ref(new Map())
   const lastTime = ref(0)
   const accumulator = ref(0)
   
-  const FIXED_TIME_STEP = 1/120
   const MAX_SUBSTEPS = 3
 
   const isDiceSettled = (rigidBody) => {
@@ -22,20 +23,22 @@ export const usePhysicsSystem = () => {
                    Math.abs(angVel.y) < SETTLE_THRESHOLD &&
                    Math.abs(angVel.z) < SETTLE_THRESHOLD
 
-
-
     return settled
-}
-
-  const updatePhysics = (world, deltaTime) => {
-    accumulator.value += deltaTime
-    while (accumulator.value >= FIXED_TIME_STEP) {
-      world.step()
-      accumulator.value -= FIXED_TIME_STEP
-    }
-    return accumulator.value / FIXED_TIME_STEP
   }
 
+  const updatePhysics = (world, deltaTime) => {
+    const timeStep = physicsStore.currentTimeStep
+    accumulator.value += deltaTime
+    
+    while (accumulator.value >= timeStep) {
+      world.step()
+      accumulator.value -= timeStep
+    }
+    
+    return accumulator.value / timeStep
+  }
+
+  // Rest of the functions remain the same
   const storePhysicsState = (rigidBodies) => {
     rigidBodies.forEach((rb, index) => {
       if (rb) {
@@ -64,14 +67,12 @@ export const usePhysicsSystem = () => {
       const current = currentState.value.get(index)
       
       if (previous && current && die) {
-        // Interpolate position
         die.position.lerpVectors(
           new THREE.Vector3(previous.position.x, previous.position.y, previous.position.z),
           new THREE.Vector3(current.position.x, current.position.y, current.position.z),
           alpha
         )
         
-        // Interpolate rotation
         const prevQuat = new THREE.Quaternion(
           previous.rotation.x, previous.rotation.y, 
           previous.rotation.z, previous.rotation.w
