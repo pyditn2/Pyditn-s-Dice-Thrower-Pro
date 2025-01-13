@@ -5,11 +5,13 @@ import DiceCheck from './components/DiceCheck.vue'
 import CharacterEditor from './components/CharacterEditor.vue'
 import CharacterSelector from "./components/CharacterSelector.vue";
 import OptionsMenu from './components/OptionsMenu.vue'
+import AnimateBackground from './components/AnimateBackground.vue'
 
 const activeTab = ref('dice')
 </script>
 
 <template>
+  <AnimateBackground />
   <div class="app">
     <!-- Tab Navigation -->
     <div class="tab-navigation">
@@ -43,19 +45,28 @@ const activeTab = ref('dice')
 html, body {
   margin: 0;
   padding: 0;
-  background-color: #000000;
+  background-color: transparent; /* Changed from #000000 */
   color: #ffffff;
 }
+
 .app {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
   min-height: 100vh;
-  background-color: #000000;
+  background-color: transparent; /* Changed from #000000 */
   text-align: center;
 }
 
+/* Add a semi-transparent background to content areas for better readability */
+.tab-content {
+  padding: 1rem;
+  color: #ffffff;
+  background-color: rgba(0, 0, 0, 0.5); /* Added semi-transparent background */
+  border-radius: 8px;
+}
 
+/* Rest of your styles remain the same */
 .tab-navigation {
   display: flex;
   gap: 1rem;
@@ -67,7 +78,7 @@ html, body {
 
 .tab-button {
   padding: 0.5rem 1rem;
-  background-color: #333333;
+  background-color: rgba(51, 51, 51, 0.8); /* Made slightly transparent */
   color: #ffffff;
   border: none;
   cursor: pointer;
@@ -76,7 +87,26 @@ html, body {
 }
 
 .tab-button:hover {
-  background-color: #444444;
+  background-color: rgba(68, 68, 68, 0.8); /* Made slightly transparent */
+}
+
+.tab-button.active {
+  background-color: rgba(0, 0, 0, 0.8); /* Made slightly transparent */
+  border-bottom: 2px solid #42b983;
+  font-weight: bold;
+}
+
+/* You might want to add some transparency to other UI elements as well */
+button, input, select {
+  background-color: rgba(51, 51, 51, 0.8); /* Made slightly transparent */
+  color: #ffffff;
+  border: 1px solid #444444;
+  border-radius: 4px;
+  padding: 0.5rem;
+}
+
+button:hover {
+  background-color: rgba(68, 68, 68, 0.8); /* Made slightly transparent */
 }
 
 .tab-button.active {
