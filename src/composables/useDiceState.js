@@ -58,6 +58,10 @@ export const useDiceState = () => {
   }
 
   const resetDice = () => {
+    // Clean up all dice physics before resetting arrays
+    diceManager.cleanupAllDice()
+    
+    // Reset arrays
     dice.value = []
     rigidBodies.value = []
     settledDice.value.clear()

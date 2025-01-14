@@ -4,6 +4,7 @@ import RAPIER from '@dimforge/rapier3d-compat'
 export class BaseDice {
   constructor() {
     this.diceNumbers = []
+    this.activeColliders = new Set()
   }
 
   createNumberTexture(number) {
@@ -77,10 +78,40 @@ export class BaseDice {
         .setRestitution(0.3)
         .setFriction(0.8)
         .setDensity(2.0)
-      world.createCollider(colliderDesc, rigidBody)
+      const collider = world.createCollider(colliderDesc, rigidBody)
+      this.activeColliders.add(collider) // Track the created collider
+      
+      // Create and attach wireframe visualization
+      const wireframeMesh = this.createColliderWireframe(vertices)
+      if (wireframeMesh) {
+        rigidBody.userData = { wireframeMesh }
+      }
     }
 
     return rigidBody
+  }
+
+  createColliderWireframe(vertices) {
+    // Create a buffer geometry from the convex hull vertices
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+    
+    // Create wireframe material
+    const material = new THREE.LineBasicMaterial({
+      color: 0x00ffff,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.5
+    })
+
+    // Create wireframe mesh
+    const wireframe = new THREE.LineSegments(
+      new THREE.WireframeGeometry(geometry),
+      material
+    )
+    
+    wireframe.visible = false // Initially hidden, will be toggled by wireframe system
+    return wireframe
   }
 
   getUpFacingNumber(dice) {
@@ -108,5 +139,28 @@ export class BaseDice {
     
     console.log("Selected number:", result, "with dot product:", maxDot); // Debug log
     return result
+  }
+
+  cleanup(world, rigidBody) {
+    // Remove all colliders associated with this rigid body
+    this.activeColliders.forEach(collider => {
+      if (collider.parent() === rigidBody) {
+        world.removeCollider(collider)
+        this.activeColliders.delete(collider)
+      }
+    })
+
+    // Remove the rigid body itself
+    if (rigidBody) {
+      world.removeRigidBody(rigidBody)
+    }
+
+    // Clean up wireframe if it exists
+    if (rigidBody.userData?.wireframeMesh) {
+      const wireframe = rigidBody.userData.wireframeMesh
+      if (wireframe.parent) {
+        wireframe.parent.remove(wireframe)
+      }
+    }
   }
 }

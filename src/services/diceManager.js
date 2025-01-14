@@ -1,16 +1,16 @@
+import * as THREE from 'three'
 import { D6Dice } from './D6Dice'
 import { D20Dice } from './D20Dice'
 
 export class DiceManager {
   constructor() {
-    // Create single instances of each die type
     this.diceInstances = {
       'd6': new D6Dice(),
       'd20': new D20Dice()
+      
     }
-    
-    // Keep track of created dice and their types
     this.activeDice = new Map()
+    this.wireframesVisible = false
   }
 
   createDice(type, world) {
@@ -21,26 +21,56 @@ export class DiceManager {
     
     const { mesh, rigidBody } = diceCreator.createDice(world)
     
-    // Store the die instance for later reference
-    this.activeDice.set(mesh.uuid, diceCreator)
+    // Create and add wireframe to the mesh
+    if (rigidBody.userData?.wireframeMesh) {
+      mesh.add(rigidBody.userData.wireframeMesh)
+    }
+
+    rigidBody.userData.wireframeMesh.visible = this.wireframesVisible
+    
+    // Store complete dice info for cleanup
+    this.activeDice.set(mesh.uuid, {
+      creator: diceCreator,
+      rigidBody: rigidBody,
+      world: world,
+      mesh: mesh
+    })
     
     return { mesh, rigidBody }
   }
 
+  toggleWireframes(visible) {
+    this.wireframesVisible = visible
+    this.activeDice.forEach(({ mesh }) => {
+      const wireframe = mesh.children.find(child => child instanceof THREE.LineSegments)
+      if (wireframe) {
+        wireframe.visible = visible
+      }
+    })
+  }
+
+  removeDice(dice) {
+    const diceInfo = this.activeDice.get(dice.uuid)
+    if (diceInfo) {
+      // Clean up physics and wireframes
+      diceInfo.creator.cleanup(diceInfo.world, diceInfo.rigidBody)
+      this.activeDice.delete(dice.uuid)
+    }
+  }
+
+  cleanupAllDice() {
+    for (const [uuid, diceInfo] of this.activeDice.entries()) {
+      diceInfo.creator.cleanup(diceInfo.world, diceInfo.rigidBody)
+    }
+    this.activeDice.clear()
+  }
+
   getUpFacingNumber(dice) {
-    // Get the specific die instance that created this die
-    const diceCreator = this.activeDice.get(dice.uuid)
-    if (!diceCreator) {
-      console.warn('No dice creator found for die:', dice)
+    const diceInfo = this.activeDice.get(dice.uuid)
+    if (!diceInfo) {
+      console.warn('No dice info found for die:', dice)
       return null
     }
-    
-    // Use that instance's getUpFacingNumber implementation
-    return diceCreator.getUpFacingNumber(dice)
-  }
-  
-  // Clean up method to remove references when dice are destroyed
-  removeDice(dice) {
-    this.activeDice.delete(dice.uuid)
+    return diceInfo.creator.getUpFacingNumber(dice)
   }
 }
