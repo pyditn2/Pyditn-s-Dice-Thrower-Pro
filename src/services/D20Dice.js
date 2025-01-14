@@ -25,10 +25,10 @@ export class D20Dice extends BaseDice {
       })
     )
     
-    label.castShadow = true
+    label.castShadow = false
 
     // Position the label slightly above the face
-    const offset = 0.01  // Very small offset to prevent z-fighting
+    const offset = 0.01
     label.position.copy(center.clone().add(normal.clone().multiplyScalar(offset)))
 
     // Create a rotation matrix to align with the face

@@ -1,9 +1,10 @@
-// components/OptionsMenu.vue
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { usePhysicsStore } from '../stores/physicsStore'
+import { useBackgroundStore } from '../stores/backgroundStore'
 
 const physicsStore = usePhysicsStore()
+const backgroundStore = useBackgroundStore()
 const isMenuOpen = ref(false)
 const menuRef = ref(null)
 
@@ -14,20 +15,24 @@ const speedOptions = [
 ]
 
 const handleClickOutside = (event) => {
-  // Check if menu is open and click is outside both the menu and toggle button
   if (isMenuOpen.value && menuRef.value && !menuRef.value.contains(event.target)) {
     isMenuOpen.value = false
   }
 }
 
 const toggleMenu = (event) => {
-  // Prevent this click from triggering the click-outside handler
   event.stopPropagation()
   isMenuOpen.value = !isMenuOpen.value
 }
 
 const setSpeed = (speed) => {
   physicsStore.setAnimationSpeed(speed)
+}
+
+const toggleBackground = () => {
+  backgroundStore.setBackground(
+    backgroundStore.currentBackground === 'schwarz' ? 'animiert' : 'schwarz'
+  )
 }
 
 onMounted(() => {
@@ -65,7 +70,7 @@ onUnmounted(() => {
     >
       <div v-if="isMenuOpen" class="menu-panel">
         <div class="menu-section">
-          <h3>Animation Speed</h3>
+          <h3>Animationsgeschwindigkeit</h3>
           <div class="speed-toggle">
             <button 
               v-for="option in speedOptions" 
@@ -77,7 +82,16 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
-        <!-- Additional menu sections hier -->
+        <div class="menu-section">
+            <h3>Hintergrund</h3>
+          <button 
+            class="background-toggle"
+            :class="{ active: backgroundStore.currentBackground === 'animiert' }"
+            @click="toggleBackground"
+          >
+            Hintergrund animiert
+          </button>
+        </div>
       </div>
     </Transition>
   </div>
@@ -161,6 +175,10 @@ onUnmounted(() => {
   margin-bottom: 1rem;
 }
 
+.menu-section:last-child {
+  margin-bottom: 0;
+}
+
 .menu-section h3 {
   color: #fff;
   font-size: 0.9rem;
@@ -189,6 +207,26 @@ onUnmounted(() => {
 }
 
 .speed-toggle button.active {
+  background: #42b983;
+  border-color: #42b983;
+}
+
+.background-toggle {
+  width: 100%;
+  padding: 0.5rem;
+  background: #333;
+  border: 1px solid #444;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.background-toggle:hover {
+  background: #444;
+}
+
+.background-toggle.active {
   background: #42b983;
   border-color: #42b983;
 }

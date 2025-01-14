@@ -409,7 +409,7 @@ watch(currentCheckType, (newType) => {
         <div class="success-indicator">
           {{ result.critical || (result.success ? 'Erfolg!' : 'Misserfolg!') }}
         </div>
-        <div v-if="result.success" class="result-qs">QS {{ result.qualityLevel }}</div>
+        <div v-if="result.success && result.type !== 'combat'" class="result-qs">QS {{ result.qualityLevel }}</div>
         <div class="result-line">Würfe: {{ result.rolls.join(', ') }}</div>
 
         <template v-if="result.type === 'attribute'">

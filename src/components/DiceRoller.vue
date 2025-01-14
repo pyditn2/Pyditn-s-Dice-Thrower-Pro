@@ -206,7 +206,9 @@ onBeforeUnmount(() => {
 
 const handleKeydown = (event) => {
   if (event.key.toLowerCase() === 'w') {
-    sceneSystem.toggleWireframes()
+    // Let's add a debug log to verify diceState.diceManager exists
+    console.log("DiceManager instance:", diceState.diceManager)
+    sceneSystem.toggleWireframes(diceState.diceManager)
   }
 }
 

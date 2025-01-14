@@ -2,6 +2,8 @@ import { ref, markRaw } from 'vue'
 import * as THREE from 'three'
 import RAPIER from '@dimforge/rapier3d-compat'
 
+const diceWireframes = ref([])
+
 const GRAVITY = -25
 
 export const useSceneSystem = () => {
@@ -158,6 +160,35 @@ export const useSceneSystem = () => {
     wireframeHelpers.value.push(groundHelper)
   }
 
+  const addDiceWireframe = (colliderDesc, mesh) => {
+    // Extract vertices and indices from the collider description
+    const vertices = colliderDesc.shape.vertices
+    const indices = colliderDesc.shape.indices
+  
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+    geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1))
+  
+    const wireframeMaterial = new THREE.LineBasicMaterial({
+      color: 0x00ffff, // Cyan color to distinguish from ground/walls
+      linewidth: 1
+    })
+  
+    const wireframe = new THREE.LineSegments(
+      new THREE.WireframeGeometry(geometry),
+      wireframeMaterial
+    )
+    
+    // Link the wireframe to the mesh
+    wireframe.matrixAutoUpdate = false
+    mesh.add(wireframe)
+    
+    wireframe.visible = showWireframes.value
+    diceWireframes.value.push(wireframe)
+    
+    return wireframe
+  }
+
   const createWalls = (baseVertices, topVertices, height, wallThickness, feltMaterial, groundRigidBody) => {
     for (let i = 0; i < 6; i++) {
       const nextI = (i + 1) % 6
@@ -254,20 +285,35 @@ export const useSceneSystem = () => {
   }
 
   const cleanupScene = () => {
+    // Clear dice wireframes first
+    diceWireframes.value.forEach(wireframe => {
+      if (wireframe.parent) {
+        wireframe.parent.remove(wireframe)
+      }
+    })
+    diceWireframes.value = []
+  
     while (scene.value.children.length > 0) {
       scene.value.remove(scene.value.children[0])
     }
-
+  
     scene.value.add(setupMainLight())
     scene.value.add(new THREE.AmbientLight(0x404040))
     createHexagonalGround()
   }
-
-  const toggleWireframes = () => {
+  
+  const toggleWireframes = (diceManagerInstance) => {
     showWireframes.value = !showWireframes.value
+    
+    // Toggle scene wireframes
     wireframeHelpers.value.forEach(helper => {
       helper.visible = showWireframes.value
     })
+    
+    // Toggle dice wireframes if diceManager instance was provided
+    if (diceManagerInstance) {
+      diceManagerInstance.toggleWireframes(showWireframes.value)
+    }
   }
 
   return {
@@ -276,6 +322,7 @@ export const useSceneSystem = () => {
     showWireframes: ref(false),
     initScene,
     cleanupScene,
-    toggleWireframes
+    toggleWireframes,
+    addDiceWireframe
   }
 }
