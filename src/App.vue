@@ -5,13 +5,13 @@ import DiceCheck from './components/DiceCheck.vue'
 import CharacterEditor from './components/CharacterEditor.vue'
 import CharacterSelector from "./components/CharacterSelector.vue";
 import OptionsMenu from './components/OptionsMenu.vue'
-import AnimateBackground from './components/AnimateBackground.vue'
+import ThreeBackground from './components/ThreeBackground.vue'
 
 const activeTab = ref('dice')
 </script>
 
 <template>
-  <AnimateBackground />
+  <ThreeBackground />
   <div class="app">
     <!-- Tab Navigation -->
     <div class="tab-navigation">
