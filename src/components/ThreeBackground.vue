@@ -13,17 +13,20 @@ const backgroundClass = computed(() => {
 // Three.js variables
 let scene, camera, renderer, clock, shapes = [], circleGroup
 let isAnimating = false
-const rotationSpeed = 0.005 // Rotations per second
+const rotationSpeed = 0.005/2 // Rotations per second
 
 // Create d20 shape
 function createHexagon() {
   const geometry = new THREE.IcosahedronGeometry(4)
-  const material = new THREE.MeshPhongMaterial({
-    color: 0x996515,           // Antique gold base color
-    specular: 0xffd700,        // Gold-colored specular highlights
-    shininess: 200,            // Increased shininess for more reflectivity
+  const material = new THREE.MeshPhysicalMaterial({
+    color: 0x258141,           // Antique gold base color
+    metalness: 0.9,            // High metalness for strong specular
+    roughness: 0.1,            // Low roughness for sharp reflections
+    clearcoat: 1.0,            // Maximum clearcoat for extra shine
+    clearcoatRoughness: 0.1,   // Sharp clearcoat reflections
     reflectivity: 1,           // Maximum reflectivity
-    flatShading: false         // Smooth shading
+    flatShading: false,        // Smooth shading
+    envMapIntensity: 1.0       // Full environment map intensity
   })
   
   const mesh = new THREE.Mesh(geometry, material)
@@ -41,12 +44,15 @@ function createHexagon() {
 // Create square shape
 function createSquare() {
   const geometry = new THREE.BoxGeometry(6, 6, 6)
-  const material = new THREE.MeshPhongMaterial({
-    color: 0x996515,           // Antique gold base color
-    specular: 0xffd700,        // Gold-colored specular highlights
-    shininess: 200,            // Increased shininess for more reflectivity
+  const material = new THREE.MeshPhysicalMaterial({
+    color: 0x331127,           // Antique gold base color
+    metalness: 0.9,            // High metalness for strong specular
+    roughness: 0.1,            // Low roughness for sharp reflections
+    clearcoat: 1.0,            // Maximum clearcoat for extra shine
+    clearcoatRoughness: 0.1,   // Sharp clearcoat reflections
     reflectivity: 1,           // Maximum reflectivity
-    flatShading: false         // Smooth shading
+    flatShading: false,        // Smooth shading
+    envMapIntensity: 1.0       // Full environment map intensity
   })
   
   const mesh = new THREE.Mesh(geometry, material)
@@ -64,7 +70,7 @@ function createSquare() {
 // Create shapes arranged in a circle
 function createShapes() {
   const numShapes = 40
-  const radius = 180
+  const radius = 120
   
   for (let i = 0; i < numShapes; i++) {
     const isHexagon = i % 2 === 0
@@ -83,7 +89,7 @@ function createShapes() {
 // Initialize Three.js scene
 function initScene() {
   scene = new THREE.Scene()
-  camera = new THREE.PerspectiveCamera(20, window.innerWidth / window.innerHeight, 0.1, 1000)
+  camera = new THREE.PerspectiveCamera(10, window.innerWidth / window.innerHeight, 0.1, 1000)
   renderer = new THREE.WebGLRenderer({ 
     antialias: true, 
     alpha: true,
@@ -95,6 +101,7 @@ function initScene() {
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setClearColor(0x000000, 0)
   renderer.setPixelRatio(window.devicePixelRatio)
+  renderer.physicallyCorrectLights = true // Enable physically correct lighting
   
   const canvas = renderer.domElement
   canvas.addEventListener('contextmenu', (e) => {
@@ -105,47 +112,99 @@ function initScene() {
   
   // Setup camera
   camera.position.z = 600
-  camera.position.y = 150
+  camera.position.y = -30
   
-  // Setup lighting
-  // Main directional lights from different angles
-  const mainLight = new THREE.DirectionalLight(0xffffff, 1.5)
-  mainLight.position.set(1, 1, 1)
+  // Setup lighting with much brighter intensities
+  // Main spotlight with very high intensity
+  const mainLight = new THREE.SpotLight(0xffffff, 8)
+  mainLight.position.set(1, 1, 1).multiplyScalar(600)
+  mainLight.angle = Math.PI / 2
+  mainLight.penumbra = 0.1 // Sharper edge for more defined highlights
+  mainLight.decay = 0.1 // Less decay for stronger light at distance
+  mainLight.distance = 2000
   scene.add(mainLight)
 
-  const frontLight = new THREE.DirectionalLight(0xffffff, 1.2)
-  frontLight.position.set(0, 0, 1)
+  // Front spotlight with increased intensity
+  const frontLight = new THREE.SpotLight(0xffffff, 5)
+  frontLight.position.set(0, 0, 1).multiplyScalar(600)
+  frontLight.angle = Math.PI / 2
+  frontLight.penumbra = 0.1
+  frontLight.decay = 0.1
+  frontLight.distance = 2000
   scene.add(frontLight)
 
-  const rightLight = new THREE.DirectionalLight(0xffffff, 1.2)
-  rightLight.position.set(1, 0, 0)
+  // Right spotlight with increased intensity
+  const rightLight = new THREE.SpotLight(0xffffff, 5)
+  rightLight.position.set(1, 0, 0).multiplyScalar(600)
+  rightLight.angle = Math.PI / 2
+  rightLight.penumbra = 0.1
+  rightLight.decay = 0.1
+  rightLight.distance = 2000
   scene.add(rightLight)
 
-  // Add lights for better coverage
-  const topLight = new THREE.DirectionalLight(0xffffff, 1.0)
-  topLight.position.set(0, 1, 0)
+  // Top spotlight
+  const topLight = new THREE.SpotLight(0xffffff, 4)
+  topLight.position.set(0, 1, 0).multiplyScalar(600)
+  topLight.angle = Math.PI / 2
+  topLight.penumbra = 0.1
+  topLight.decay = 0.1
+  topLight.distance = 2000
   scene.add(topLight)
 
-  const bottomLight = new THREE.DirectionalLight(0xffffff, 0.8)
-  bottomLight.position.set(0, -1, 0)
+  // Bottom spotlight
+  const bottomLight = new THREE.SpotLight(0xffffff, 4)
+  bottomLight.position.set(0, -1, 0).multiplyScalar(600)
+  bottomLight.angle = Math.PI / 2
+  bottomLight.penumbra = 0.1
+  bottomLight.decay = 0.1
+  bottomLight.distance = 2000
   scene.add(bottomLight)
 
-  const backLight = new THREE.DirectionalLight(0xffffff, 0.8)
-  backLight.position.set(0, 0, -1)
+  // Back spotlight
+  const backLight = new THREE.SpotLight(0xffffff, 4)
+  backLight.position.set(0, 0, -1).multiplyScalar(600)
+  backLight.angle = Math.PI / 2
+  backLight.penumbra = 0.1
+  backLight.decay = 0.1
+  backLight.distance = 2000
   scene.add(backLight)
 
-  // Corner lights for extra highlights
-  const topCornerLight = new THREE.DirectionalLight(0xffffff, 0.6)
-  topCornerLight.position.set(1, 1, -1)
+  // Corner spotlights with increased intensity for better highlights
+  const topCornerLight = new THREE.SpotLight(0xffffff, 3)
+  topCornerLight.position.set(1, 1, -1).multiplyScalar(600)
+  topCornerLight.angle = Math.PI / 2
+  topCornerLight.penumbra = 0.1
+  topCornerLight.decay = 0.1
+  topCornerLight.distance = 2000
   scene.add(topCornerLight)
 
-  const bottomCornerLight = new THREE.DirectionalLight(0xffffff, 0.6)
-  bottomCornerLight.position.set(-1, -1, 1)
+  const bottomCornerLight = new THREE.SpotLight(0xffffff, 3)
+  bottomCornerLight.position.set(-1, -1, 1).multiplyScalar(600)
+  bottomCornerLight.angle = Math.PI / 2
+  bottomCornerLight.penumbra = 0.1
+  bottomCornerLight.decay = 0.1
+  bottomCornerLight.distance = 2000
   scene.add(bottomCornerLight)
 
-  // Increased ambient light for better base illumination
-  const ambientLight = new THREE.AmbientLight(0x404040, 0.8)
+  // Much brighter ambient light
+  const ambientLight = new THREE.AmbientLight(0xffffff, 6)
   scene.add(ambientLight)
+
+  // Configure shadows with higher resolution
+  const spotLights = [
+    mainLight, frontLight, rightLight, topLight, 
+    bottomLight, backLight, topCornerLight, bottomCornerLight
+  ]
+
+  spotLights.forEach(light => {
+    light.castShadow = true
+    light.shadow.mapSize.width = 1024 // Higher resolution shadows
+    light.shadow.mapSize.height = 1024
+    light.shadow.camera.near = 0.5
+    light.shadow.camera.far = 2000
+    light.shadow.bias = -0.0001 // Reduced shadow bias for sharper shadows
+    light.shadow.radius = 1 // Slightly softer shadow edges
+  })
   
   // Create group for shapes
   circleGroup = new THREE.Group()
