@@ -62,7 +62,7 @@ export class D6Dice extends BaseDice {
   }
 
   addNumbersToMesh(mesh) {
-    console.log("Adding numbers to D6"); // Debug log
+    //("Adding numbers to D6"); // Debug log
     this.diceNumbers = [];
     
     this.layout.forEach((number, i) => {
@@ -81,6 +81,6 @@ export class D6Dice extends BaseDice {
       });
     });
     
-    console.log("Final dice numbers:", this.diceNumbers); // Debug log
+    //console.log("Final dice numbers:", this.diceNumbers); // Debug log
   }
 }

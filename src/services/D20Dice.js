@@ -59,7 +59,7 @@ export class D20Dice extends BaseDice {
   }
 
   addNumbersToMesh(mesh) {
-    console.log("Adding numbers to D20"); // Debug log
+    //console.log("Adding numbers to D20"); // Debug log
     this.diceNumbers = [];
     
     const geometry = mesh.geometry;
@@ -86,7 +86,7 @@ export class D20Dice extends BaseDice {
       faceNormals.push(normal);
       faceCenters.push(center);
       
-      console.log(`Face ${i/9} center:`, center, "normal:", normal); // Debug log
+      //console.log(`Face ${i/9} center:`, center, "normal:", normal); // Debug log
     }
     
     this.layout.forEach((number, i) => {
@@ -104,10 +104,10 @@ export class D20Dice extends BaseDice {
           normal: faceNormals[i].clone() // Make sure to clone the normal
         });
         
-        console.log(`Added number ${number} with normal:`, faceNormals[i]); // Debug log
+        //console.log(`Added number ${number} with normal:`, faceNormals[i]); // Debug log
       }
     });
     
-    console.log("Final dice numbers:", this.diceNumbers); // Debug log
+    //console.log("Final dice numbers:", this.diceNumbers); // Debug log
   }
 }

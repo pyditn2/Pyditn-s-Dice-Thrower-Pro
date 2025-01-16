@@ -115,9 +115,9 @@ export class BaseDice {
   }
 
   getUpFacingNumber(dice) {
-    console.log("Checking dice numbers:", this.diceNumbers); // Debug log
+    //console.log("Checking dice numbers:", this.diceNumbers); // Debug log
     if (!this.diceNumbers.length) {
-      console.log("No dice numbers found!");
+      //console.log("No dice numbers found!");
       return null;
     }
     
@@ -130,14 +130,14 @@ export class BaseDice {
       worldNormal.applyQuaternion(dice.quaternion)
       
       const dot = worldNormal.dot(upVector)
-      console.log(`Number ${number} has dot product: ${dot}`); // Debug log
+      //console.log(`Number ${number} has dot product: ${dot}`); // Debug log
       if (dot > maxDot) {
         maxDot = dot
         result = number
       }
     })
     
-    console.log("Selected number:", result, "with dot product:", maxDot); // Debug log
+    //console.log("Selected number:", result, "with dot product:", maxDot); // Debug log
     return result
   }
 
