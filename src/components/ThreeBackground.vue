@@ -2,8 +2,11 @@
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import * as THREE from 'three'
 import { useBackgroundStore } from '../stores/backgroundStore'
+import { storeToRefs } from 'pinia'
 
 const backgroundStore = useBackgroundStore()
+const { hexagonColor, squareColor } = storeToRefs(backgroundStore)
+
 const containerRef = ref(null)
 
 const backgroundClass = computed(() => {
@@ -19,11 +22,11 @@ const rotationSpeed = 0.005/2 // Rotations per second
 function createHexagon() {
   const geometry = new THREE.IcosahedronGeometry(4)
   const material = new THREE.MeshPhysicalMaterial({
-    color: 0x258141,
-    metalness: 0.9,            // Higher metalness for stronger specular
-    roughness: 0.1,            // Lower roughness for sharper reflections
+    color: new THREE.Color(hexagonColor.value),
+    metalness: 0.9,
+    roughness: 0.1,
     clearcoat: 1.0,
-    clearcoatRoughness: 0.01,  // Much lower for sharper clearcoat reflections
+    clearcoatRoughness: 0.01,
     reflectivity: 1,
     flatShading: false,
     envMapIntensity: 1.0
@@ -39,15 +42,14 @@ function createHexagon() {
   return mesh
 }
 
-// Create square shape
 function createSquare() {
   const geometry = new THREE.BoxGeometry(6, 6, 6)
   const material = new THREE.MeshPhysicalMaterial({
-    color: 0x331127,
-    metalness: 0.9,            // Higher metalness for stronger specular
-    roughness: 0.1,            // Lower roughness for sharper reflections
+    color: new THREE.Color(squareColor.value),
+    metalness: 0.9,
+    roughness: 0.1,
     clearcoat: 1.0,
-    clearcoatRoughness: 0.01,  // Much lower for sharper clearcoat reflections
+    clearcoatRoughness: 0.01,
     reflectivity: 1,
     flatShading: false,
     envMapIntensity: 1.0
@@ -65,8 +67,8 @@ function createSquare() {
 
 function createHighlightLight(position) {
   const light = new THREE.SpotLight(0xffffff, 150)
-  light.position.set(400, 400, 200)  // Fixed position in top-right
-  light.angle = Math.PI / 6           // 30 degrees
+  light.position.set(400, 400, 200)  
+  light.angle = Math.PI / 6 
   light.penumbra = 0.1
   light.decay = 0.5
   light.distance = 1500
@@ -206,19 +208,23 @@ function initScene() {
 
 // Animation loop
 function animate() {
-  if (!isAnimating) return
+  if (!isAnimating || !clock || !renderer || !scene || !camera) return
   
   requestAnimationFrame(animate)
   
   const delta = clock.getDelta()
-  circleGroup.rotation.z += rotationSpeed * delta * Math.PI * 2
-  
-  // Update each shape's individual rotation
-  shapes.forEach((shape) => {
-    shape.rotation.x += shape.userData.rotationSpeed.x
-    shape.rotation.y += shape.userData.rotationSpeed.y
-    shape.rotation.z += shape.userData.rotationSpeed.z
-  })
+  if (circleGroup) {
+    circleGroup.rotation.z += rotationSpeed * delta * Math.PI * 2
+    
+    // Update each shape's individual rotation
+    shapes.forEach((shape) => {
+      if (shape) {
+        shape.rotation.x += shape.userData.rotationSpeed.x
+        shape.rotation.y += shape.userData.rotationSpeed.y
+        shape.rotation.z += shape.userData.rotationSpeed.z
+      }
+    })
+  }
   
   renderer.render(scene, camera)
 }
@@ -259,19 +265,31 @@ watch(
   () => backgroundStore.currentBackground,
   (newValue) => {
     isAnimating = newValue === 'animiert'
-    if (isAnimating) {
+    if (isAnimating && clock && scene && camera && renderer) {
       animate()
     }
   },
   { immediate: true }
 )
 
+watch([hexagonColor, squareColor], ([newHexColor, newSquareColor]) => {
+  shapes.forEach((shape, index) => {
+    const isHexagon = index % 2 === 0
+    const newColor = isHexagon ? newHexColor : newSquareColor
+    shape.material.color.set(newColor)
+  })
+})
+
 // Component lifecycle hooks
 onMounted(() => {
   if (containerRef.value) {
     initScene()
     window.addEventListener('resize', onWindowResize)
-    animate()
+    // Only start animation if background is set to 'animiert'
+    if (backgroundStore.currentBackground === 'animiert') {
+      isAnimating = true
+      animate()
+    }
   }
 })
 

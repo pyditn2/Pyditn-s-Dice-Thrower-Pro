@@ -35,6 +35,14 @@ const toggleBackground = () => {
   )
 }
 
+const updateHexagonColor = (event) => {
+  backgroundStore.setHexagonColor(event.target.value)
+}
+
+const updateSquareColor = (event) => {
+  backgroundStore.setSquareColor(event.target.value)
+}
+
 onMounted(() => {
   document.addEventListener('mousedown', handleClickOutside)
 })
@@ -82,8 +90,9 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
+        
         <div class="menu-section">
-            <h3>Hintergrund</h3>
+          <h3>Hintergrund</h3>
           <button 
             class="background-toggle"
             :class="{ active: backgroundStore.currentBackground === 'animiert' }"
@@ -91,6 +100,28 @@ onUnmounted(() => {
           >
             Hintergrund animiert
           </button>
+        </div>
+
+        <div v-if="backgroundStore.currentBackground === 'animiert'" class="menu-section">
+          
+          <div class="color-controls">
+            <div class="color-control">
+              <label>Icosahedron</label>
+              <input 
+                type="color" 
+                :value="backgroundStore.hexagonColor"
+                @input="updateHexagonColor"
+              >
+            </div>
+            <div class="color-control">
+              <label>Würfel</label>
+              <input 
+                type="color" 
+                :value="backgroundStore.squareColor"
+                @input="updateSquareColor"
+              >
+            </div>
+          </div>
         </div>
       </div>
     </Transition>
@@ -259,5 +290,51 @@ onUnmounted(() => {
     opacity: 0;
     transform: scale(0.95);
   }
+}
+
+.color-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.color-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #333;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #444;
+}
+
+.color-control label {
+  color: white;
+  font-size: 0.9rem;
+}
+
+.color-control input[type="color"] {
+  width: 40px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  background: none;
+}
+
+.color-control input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-control input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+/* For Firefox */
+.color-control input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: 2px;
 }
 </style>
