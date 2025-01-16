@@ -7,19 +7,24 @@ export class DiceManager {
     this.diceInstances = {
       'd6': new D6Dice(),
       'd20': new D20Dice()
-      
     }
     this.activeDice = new Map()
     this.wireframesVisible = false
   }
 
-  createDice(type, world) {
+  createDice(type, world, appearance = null) {
     const diceCreator = this.diceInstances[type]
     if (!diceCreator) {
       throw new Error(`Unsupported dice type: ${type}`)
     }
     
-    const { mesh, rigidBody } = diceCreator.createDice(world)
+    // Create new instance with appearance
+    const newDice = type === 'd6' ? new D6Dice() : new D20Dice()
+    if (appearance) {
+      newDice.setAppearance(appearance)
+    }
+    
+    const { mesh, rigidBody } = newDice.createDice(world)
     
     // Create and add wireframe to the mesh
     if (rigidBody.userData?.wireframeMesh) {
@@ -30,13 +35,22 @@ export class DiceManager {
     
     // Store complete dice info for cleanup
     this.activeDice.set(mesh.uuid, {
-      creator: diceCreator,
+      creator: newDice,
       rigidBody: rigidBody,
       world: world,
-      mesh: mesh
+      mesh: mesh,
+      appearance: appearance
     })
     
     return { mesh, rigidBody }
+  }
+
+  updateDiceAppearance(dice, appearance) {
+    const diceInfo = this.activeDice.get(dice.uuid)
+    if (diceInfo && diceInfo.creator) {
+      diceInfo.creator.updateAppearance(diceInfo.mesh, appearance)
+      diceInfo.appearance = appearance
+    }
   }
 
   toggleWireframes(visible) {
@@ -52,7 +66,6 @@ export class DiceManager {
   removeDice(dice) {
     const diceInfo = this.activeDice.get(dice.uuid)
     if (diceInfo) {
-      // Clean up physics and wireframes
       diceInfo.creator.cleanup(diceInfo.world, diceInfo.rigidBody)
       this.activeDice.delete(dice.uuid)
     }

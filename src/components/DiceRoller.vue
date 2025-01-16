@@ -107,7 +107,7 @@ const initializeContainer = (el, index) => {
   }
 }
 
-const rollDice = async (type, count) => {
+const rollDice = async (type, count, appearance = null) => {
   try {
     if (count > maxDiceCount.value) {
       maxDiceCount.value = count
@@ -128,9 +128,12 @@ const rollDice = async (type, count) => {
       }
     }
 
+    // Handle array of appearances for multiple dice
+    const appearances = Array.isArray(appearance) ? appearance : Array(count).fill(appearance)
+
     for (let i = 0; i < count; i++) {
       const { mesh, rigidBody } = diceState.createDiceInstance(
-        type, i, count, sceneSystem.world.value
+        type, i, count, sceneSystem.world.value, appearances[i]
       )
       sceneSystem.scene.value.add(mesh)
       diceState.dice.value.push(mesh)
@@ -146,11 +149,9 @@ const rollDice = async (type, count) => {
           )
           if (allSettled) {
             clearInterval(checkSettled)
-            // Get results using DiceManager's getUpFacingNumber
             const results = diceState.dice.value.map(die =>
               diceState.diceManager.getUpFacingNumber(die)
             )
-            console.log("Settled dice results:", results) // Debug log
             resolve(results)
           }
         } catch (error) {

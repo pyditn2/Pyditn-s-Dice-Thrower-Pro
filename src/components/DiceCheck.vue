@@ -6,9 +6,11 @@ import DiceRoller from './DiceRoller.vue'
 import CharacterSelector from './CharacterSelector.vue'
 import SearchableDropdown from './SearchableDropdown.vue'
 import { CHECK_TYPES, DICE_TYPES } from '../constants/diceTypes'
+import { useDiceAppearanceStore } from '../stores/diceAppearanceStore'
 
 const characterStore = useCharacterStore()
 const diceRollerStore = useDiceRollerStore()
+const diceAppearanceStore = useDiceAppearanceStore()
 const diceRoller1 = ref(null)
 const selectedAttribute = ref('MU')
 const selectedTalentId = ref(null)
@@ -22,7 +24,8 @@ const extraD6Result = ref(null)
 
 const rollExtraD6 = async () => {
   diceRoller1.value.updateViewMode(false)
-  const roll = await diceRoller1.value.rollDice('d6', 1)
+  const appearance = diceAppearanceStore.getD6Appearance('extra')
+  const roll = await diceRoller1.value.rollDice('d6', 1, appearance)
   extraD6Result.value = roll[0]
 }
 
@@ -122,7 +125,8 @@ const rollDamage = async (weapon) => {
   console.log("Starting damage roll for:", { diceCount, diceType, modifier });
 
   diceRoller1.value.updateViewMode(true)
-  const rolls = await diceRoller1.value.rollDice(`d${diceType}`, diceCount)
+  const appearance = diceAppearanceStore.getD6Appearance('damage')
+  const rolls = await diceRoller1.value.rollDice(`d${diceType}`, diceCount, appearance)
   console.log("Damage roll results:", rolls);
   const tempBonus = tempDamageBonus.value || 0
   const damage = rolls.reduce((sum, roll) => sum + roll, 0) + modifier + tempBonus
@@ -134,12 +138,12 @@ const rollDamage = async (weapon) => {
     damageModifier: modifier,
     tempDamageBonus: tempBonus
   }
-  console.log("Updated result with damage:", result.value);
 }
 
 const rollCriticalDamage = async () => {
   diceRoller1.value.updateViewMode(false)
-  const roll = await diceRoller1.value.rollDice('d6', 1)
+  const appearance = diceAppearanceStore.getD6Appearance('critical')
+  const roll = await diceRoller1.value.rollDice('d6', 1, appearance)
   criticalDamage.value = roll[0]
 }
 
@@ -155,7 +159,11 @@ const performCheck = async () => {
   try {
     if (currentCheckType.value === CHECK_TYPES.ATTRIBUTE) {
       diceRoller1.value.updateViewMode(false)
-      const roll = await diceRoller1.value.rollDice('d20', 1)
+      const appearance = diceAppearanceStore.getD20Appearance(
+        CHECK_TYPES.ATTRIBUTE,
+        selectedAttribute.value
+      )
+      const roll = await diceRoller1.value.rollDice('d20', 1, appearance)
       console.log("Attribute check roll result:", roll);
       const attributeValue = getAttributeValue(selectedAttribute.value)
       const adjustedAttributeValue = attributeValue + modifier.value
@@ -180,65 +188,74 @@ const performCheck = async () => {
       console.log("Attribute check result set:", result.value);
 
     } else if (currentCheckType.value === CHECK_TYPES.TALENT) {
-      const talent = selectedTalent.value
-      if (!talent) return
+  const talent = selectedTalent.value
+  if (!talent) return
 
-      diceRoller1.value.updateViewMode(true)
-      const rolls = await diceRoller1.value.rollDice('d20', 3)
-      console.log("Talent check roll results:", rolls);
-      const flatRolls = rolls.flat()
-      console.log("Flattened talent rolls:", flatRolls);
+  diceRoller1.value.updateViewMode(true)
+  
+  // Prepare appearances for all dice
+  const appearances = talent.attributes.map(attribute => 
+    diceAppearanceStore.getD20Appearance(
+      CHECK_TYPES.TALENT,
+      diceAppearanceStore.preferences.useTalentColors ? null : attribute
+    )
+  )
 
-      const criticalResult = checkCriticalRolls(flatRolls)
+  // Roll all dice at once with their respective appearances
+  const rolls = await diceRoller1.value.rollDice('d20', 3, appearances)
+  console.log("Talent check roll results:", rolls)
 
-      if (criticalResult) {
-        const pointsNeeded = criticalResult.success ? 0 : talent.value + 1
-        const remainingPoints = criticalResult.success ? talent.value : -1
-        const qualityLevel = criticalResult.success ? calculateQS(remainingPoints) : 0
+  const criticalResult = checkCriticalRolls(rolls)
 
-        result.value = {
-          type: 'talent',
-          talent: talent.name,
-          rolls: flatRolls,
-          pointsNeeded,
-          remainingPoints,
-          success: criticalResult.success,
-          qualityLevel,
-          critical: criticalResult.message,
-          modifier: modifier.value
-        }
-        console.log("Talent check critical result set:", result.value);
-      } else {
-        let pointsNeeded = 0
-        const adjustedAttributes = talent.attributes.map(attr => ({
-          name: attr,
-          value: getAttributeValue(attr),
-          adjustedValue: getAttributeValue(attr) + modifier.value
-        }))
+  if (criticalResult) {
+    const pointsNeeded = criticalResult.success ? 0 : talent.value + 1
+    const remainingPoints = criticalResult.success ? talent.value : -1
+    const qualityLevel = criticalResult.success ? calculateQS(remainingPoints) : 0
 
-        adjustedAttributes.forEach((attr, index) => {
-          if (flatRolls[index] > attr.adjustedValue) {
-            pointsNeeded += flatRolls[index] - attr.adjustedValue
-          }
-        })
+    result.value = {
+      type: 'talent',
+      talent: talent.name,
+      rolls: rolls,
+      pointsNeeded,
+      remainingPoints,
+      success: criticalResult.success,
+      qualityLevel,
+      critical: criticalResult.message,
+      modifier: modifier.value
+    }
+    console.log("Talent check critical result set:", result.value)
+  } else {
+    let pointsNeeded = 0
+    const adjustedAttributes = talent.attributes.map(attr => ({
+      name: attr,
+      value: getAttributeValue(attr),
+      adjustedValue: getAttributeValue(attr) + modifier.value
+    }))
 
-        const remainingPoints = talent.value - pointsNeeded
-        const success = pointsNeeded <= talent.value
-        const qualityLevel = success ? calculateQS(remainingPoints) : 0
-
-        result.value = {
-          type: 'talent',
-          talent: talent.name,
-          rolls: flatRolls,
-          pointsNeeded,
-          remainingPoints,
-          success,
-          qualityLevel,
-          adjustedAttributes,
-          modifier: modifier.value
-        }
-        console.log("Talent check normal result set:", result.value);
+    adjustedAttributes.forEach((attr, index) => {
+      if (rolls[index] > attr.adjustedValue) {
+        pointsNeeded += rolls[index] - attr.adjustedValue
       }
+    })
+
+    const remainingPoints = talent.value - pointsNeeded
+    const success = pointsNeeded <= talent.value
+    const qualityLevel = success ? calculateQS(remainingPoints) : 0
+
+    result.value = {
+      type: 'talent',
+      talent: talent.name,
+      rolls: rolls,
+      pointsNeeded,
+      remainingPoints,
+      success,
+      qualityLevel,
+      adjustedAttributes,
+      modifier: modifier.value
+    }
+    console.log("Talent check normal result set:", result.value)
+  }
+
     } else if (currentCheckType.value === CHECK_TYPES.COMBAT) {
       if (!selectedWeapon.value) {
         alert('Bitte wählen Sie eine Waffe aus.')
@@ -246,7 +263,8 @@ const performCheck = async () => {
       }
 
       diceRoller1.value.updateViewMode(false)
-      const roll = await diceRoller1.value.rollDice('d20', 1)
+      const appearance = diceAppearanceStore.getD20Appearance(CHECK_TYPES.COMBAT)
+      const roll = await diceRoller1.value.rollDice('d20', 1, appearance)
       const baseAttackValue = selectedWeapon.value.at + selectedWeapon.value.atBonus
       const tempBonus = tempATBonus.value || 0
       const attackValue = baseAttackValue + tempBonus
@@ -805,11 +823,11 @@ watch(currentCheckType, (newType) => {
     align-items: stretch;
     gap: 0.25rem;
   }
-  
+
   .bonus-input label {
     min-width: unset;
   }
-  
+
   .bonus-input .bonus-number {
     width: 100%;
   }

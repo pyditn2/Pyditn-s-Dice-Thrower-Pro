@@ -2,9 +2,12 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { usePhysicsStore } from '../stores/physicsStore'
 import { useBackgroundStore } from '../stores/backgroundStore'
+import { useDiceAppearanceStore } from '../stores/diceAppearanceStore'
+import { CHECK_TYPES } from '../constants/diceTypes'
 
 const physicsStore = usePhysicsStore()
 const backgroundStore = useBackgroundStore()
+const diceAppearanceStore = useDiceAppearanceStore()
 const isMenuOpen = ref(false)
 const menuRef = ref(null)
 
@@ -13,6 +16,9 @@ const speedOptions = [
   { value: 2, label: '2x' },
   { value: 3, label: '3x' }
 ]
+
+const attributes = ['MU', 'KL', 'IN', 'CH', 'FF', 'GE', 'KO', 'KK']
+const d6Types = ['damage', 'critical', 'extra']
 
 const handleClickOutside = (event) => {
   if (isMenuOpen.value && menuRef.value && !menuRef.value.contains(event.target)) {
@@ -55,11 +61,7 @@ onUnmounted(() => {
 <template>
   <div class="options-menu" ref="menuRef">
     <!-- Toggle Button -->
-    <button 
-      class="options-toggle" 
-      :class="{ 'menu-open': isMenuOpen }"
-      @click="toggleMenu" 
-      aria-label="Options Menu">
+    <button class="options-toggle" :class="{ 'menu-open': isMenuOpen }" @click="toggleMenu" aria-label="Options Menu">
       <div class="dots">
         <span></span>
         <span></span>
@@ -68,58 +70,86 @@ onUnmounted(() => {
     </button>
 
     <!-- Menu Panel -->
-    <Transition
-      enter-active-class="animate-in"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="animate-out"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
+    <Transition enter-active-class="animate-in" enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100" leave-active-class="animate-out" leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95">
       <div v-if="isMenuOpen" class="menu-panel">
+        <!-- Animation Speed Section -->
         <div class="menu-section">
           <h3>Animationsgeschwindigkeit</h3>
           <div class="speed-toggle">
-            <button 
-              v-for="option in speedOptions" 
-              :key="option.value"
-              :class="{ active: physicsStore.currentSpeed === option.value }"
-              @click="setSpeed(option.value)"
-            >
+            <button v-for="option in speedOptions" :key="option.value"
+              :class="{ active: physicsStore.currentSpeed === option.value }" @click="setSpeed(option.value)">
               {{ option.label }}
             </button>
           </div>
         </div>
-        
+
+        <!-- Dice Colors Section -->
+        <div class="menu-section">
+          <h3>Würfelfarben</h3>
+          <div class="color-controls">
+            <!-- D20 Attribute Colors -->
+            <h4>D20 Attribute</h4>
+            <div class="color-control" v-for="attr in attributes" :key="attr">
+              <label>{{ attr }}</label>
+              <input type="color" :value="diceAppearanceStore.getD20Appearance(CHECK_TYPES.ATTRIBUTE, attr).color"
+                @input="(e) => diceAppearanceStore.updateD20Appearance(CHECK_TYPES.ATTRIBUTE, attr, { color: e.target.value })">
+            </div>
+
+            <div class="talent-color-toggle">
+              <label>Talentproben-Farben:</label>
+              <button class="toggle-button" :class="{ active: diceAppearanceStore.preferences.useTalentColors }"
+                @click="diceAppearanceStore.toggleTalentColors">
+                {{ diceAppearanceStore.preferences.useTalentColors ? 'Einheitliche Farbe' : 'Attributfarben' }}
+              </button>
+            </div>
+
+            <!-- D20 Special Colors -->
+            <h4>D20 Spezial</h4>
+            <div class="color-control">
+              <label>Talent</label>
+              <input type="color" :value="diceAppearanceStore.getD20Appearance(CHECK_TYPES.TALENT).color"
+                @input="(e) => diceAppearanceStore.updateD20Appearance(CHECK_TYPES.TALENT, null, { color: e.target.value })">
+            </div>
+            <div class="color-control">
+              <label>Kampf</label>
+              <input type="color" :value="diceAppearanceStore.getD20Appearance(CHECK_TYPES.COMBAT).color"
+                @input="(e) => diceAppearanceStore.updateD20Appearance(CHECK_TYPES.COMBAT, null, { color: e.target.value })">
+            </div>
+
+            <!-- D6 Colors -->
+            <h4>D6 Würfel</h4>
+            <div class="color-control" v-for="type in d6Types" :key="type">
+              <label>{{ type === 'damage' ? 'Schaden' : type === 'critical' ? 'Kritisch' : 'Extra' }}</label>
+              <input type="color" :value="diceAppearanceStore.getD6Appearance(type).color"
+                @input="(e) => diceAppearanceStore.updateD6Appearance(type, { color: e.target.value })">
+            </div>
+
+            <button class="reset-colors-button" @click="diceAppearanceStore.resetAppearances">
+              Farben zurücksetzen
+            </button>
+          </div>
+        </div>
+
+        <!-- Background Section -->
         <div class="menu-section">
           <h3>Hintergrund</h3>
-          <button 
-            class="background-toggle"
-            :class="{ active: backgroundStore.currentBackground === 'animiert' }"
-            @click="toggleBackground"
-          >
+          <button class="background-toggle" :class="{ active: backgroundStore.currentBackground === 'animiert' }"
+            @click="toggleBackground">
             Hintergrund animiert
           </button>
         </div>
 
         <div v-if="backgroundStore.currentBackground === 'animiert'" class="menu-section">
-          
           <div class="color-controls">
             <div class="color-control">
               <label>Icosahedron</label>
-              <input 
-                type="color" 
-                :value="backgroundStore.hexagonColor"
-                @input="updateHexagonColor"
-              >
+              <input type="color" :value="backgroundStore.hexagonColor" @input="updateHexagonColor">
             </div>
             <div class="color-control">
               <label>Würfel</label>
-              <input 
-                type="color" 
-                :value="backgroundStore.squareColor"
-                @input="updateSquareColor"
-              >
+              <input type="color" :value="backgroundStore.squareColor" @input="updateSquareColor">
             </div>
           </div>
         </div>
@@ -275,6 +305,7 @@ onUnmounted(() => {
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -286,6 +317,7 @@ onUnmounted(() => {
     opacity: 1;
     transform: scale(1);
   }
+
   to {
     opacity: 0;
     transform: scale(0.95);
@@ -336,5 +368,63 @@ onUnmounted(() => {
 .color-control input[type="color"]::-moz-color-swatch {
   border: none;
   border-radius: 2px;
+}
+
+.color-controls h4 {
+  color: #fff;
+  margin: 1rem 0 0.5rem;
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.reset-colors-button {
+  width: 100%;
+  padding: 0.5rem;
+  margin-top: 1rem;
+  background: #333;
+  border: 1px solid #444;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-colors-button:hover {
+  background: #444;
+}
+
+.talent-color-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #333;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #444;
+  margin-bottom: 1rem;
+}
+
+.talent-color-toggle label {
+  color: white;
+  font-size: 0.9rem;
+}
+
+.toggle-button {
+  background: #333;
+  color: white;
+  border: 1px solid #444;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toggle-button:hover {
+  background: #444;
+}
+
+.toggle-button.active {
+  background: #42b983;
+  border-color: #42b983;
 }
 </style>

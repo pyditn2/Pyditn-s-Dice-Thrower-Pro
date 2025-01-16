@@ -5,6 +5,16 @@ export class BaseDice {
   constructor() {
     this.diceNumbers = []
     this.activeColliders = new Set()
+    this.appearance = {
+      color: '#ff0000',
+      opacity: 1,
+      shininess: 30
+    }
+  }
+
+  setAppearance(appearance) {
+    this.appearance = { ...this.appearance, ...appearance }
+    return this
   }
 
   createNumberTexture(number) {
@@ -53,15 +63,47 @@ export class BaseDice {
 
   createBaseMesh(geometry) {
     const material = new THREE.MeshPhongMaterial({
-      color: 0xff0000,
-      shininess: 30,
+      color: new THREE.Color(this.appearance.color),
+      opacity: this.appearance.opacity,
+      transparent: this.appearance.opacity < 1,
+      shininess: this.appearance.shininess,
       shadowSide: THREE.BackSide,
       receiveShadow: true
     })
     
     const mesh = new THREE.Mesh(geometry, material)
     mesh.castShadow = true
+    
+    // Store the initial appearance for reference
+    mesh.userData.appearance = { ...this.appearance }
+    
     return mesh
+  }
+
+  updateAppearance(mesh, appearance) {
+    if (!mesh || !mesh.material) return
+
+    // Update stored appearance
+    mesh.userData.appearance = {
+      ...mesh.userData.appearance,
+      ...appearance
+    }
+
+    // Update material properties
+    if (appearance.color !== undefined) {
+      mesh.material.color = new THREE.Color(appearance.color)
+    }
+    
+    if (appearance.opacity !== undefined) {
+      mesh.material.opacity = appearance.opacity
+      mesh.material.transparent = appearance.opacity < 1
+    }
+    
+    if (appearance.shininess !== undefined) {
+      mesh.material.shininess = appearance.shininess
+    }
+
+    mesh.material.needsUpdate = true
   }
 
   createRigidBody(world, position, vertices) {
@@ -79,9 +121,8 @@ export class BaseDice {
         .setFriction(0.8)
         .setDensity(2.0)
       const collider = world.createCollider(colliderDesc, rigidBody)
-      this.activeColliders.add(collider) // Track the created collider
+      this.activeColliders.add(collider)
       
-      // Create and attach wireframe visualization
       const wireframeMesh = this.createColliderWireframe(vertices)
       if (wireframeMesh) {
         rigidBody.userData = { wireframeMesh }
@@ -92,11 +133,9 @@ export class BaseDice {
   }
 
   createColliderWireframe(vertices) {
-    // Create a buffer geometry from the convex hull vertices
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
     
-    // Create wireframe material
     const material = new THREE.LineBasicMaterial({
       color: 0x00ffff,
       wireframe: true,
@@ -104,22 +143,17 @@ export class BaseDice {
       opacity: 0.5
     })
 
-    // Create wireframe mesh
     const wireframe = new THREE.LineSegments(
       new THREE.WireframeGeometry(geometry),
       material
     )
     
-    wireframe.visible = false // Initially hidden, will be toggled by wireframe system
+    wireframe.visible = false
     return wireframe
   }
 
   getUpFacingNumber(dice) {
-    //console.log("Checking dice numbers:", this.diceNumbers); // Debug log
-    if (!this.diceNumbers.length) {
-      //console.log("No dice numbers found!");
-      return null;
-    }
+    if (!this.diceNumbers.length) return null
     
     const upVector = new THREE.Vector3(0, 1, 0)
     let maxDot = -1
@@ -130,19 +164,16 @@ export class BaseDice {
       worldNormal.applyQuaternion(dice.quaternion)
       
       const dot = worldNormal.dot(upVector)
-      //console.log(`Number ${number} has dot product: ${dot}`); // Debug log
       if (dot > maxDot) {
         maxDot = dot
         result = number
       }
     })
     
-    //console.log("Selected number:", result, "with dot product:", maxDot); // Debug log
     return result
   }
 
   cleanup(world, rigidBody) {
-    // Remove all colliders associated with this rigid body
     this.activeColliders.forEach(collider => {
       if (collider.parent() === rigidBody) {
         world.removeCollider(collider)
@@ -150,12 +181,10 @@ export class BaseDice {
       }
     })
 
-    // Remove the rigid body itself
     if (rigidBody) {
       world.removeRigidBody(rigidBody)
     }
 
-    // Clean up wireframe if it exists
     if (rigidBody.userData?.wireframeMesh) {
       const wireframe = rigidBody.userData.wireframeMesh
       if (wireframe.parent) {
