@@ -49,6 +49,15 @@ const updateSquareColor = (event) => {
   backgroundStore.setSquareColor(event.target.value)
 }
 
+const expandedSections = ref({
+  colors: false,
+  background: false
+})
+
+const toggleSection = (section) => {
+  expandedSections.value[section] = !expandedSections.value[section]
+}
+
 onMounted(() => {
   document.addEventListener('mousedown', handleClickOutside)
 })
@@ -60,7 +69,6 @@ onUnmounted(() => {
 
 <template>
   <div class="options-menu" ref="menuRef">
-    <!-- Toggle Button -->
     <button class="options-toggle" :class="{ 'menu-open': isMenuOpen }" @click="toggleMenu" aria-label="Options Menu">
       <div class="dots">
         <span></span>
@@ -69,12 +77,11 @@ onUnmounted(() => {
       </div>
     </button>
 
-    <!-- Menu Panel -->
     <Transition enter-active-class="animate-in" enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100" leave-active-class="animate-out" leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95">
+      enter-to-class="opacity-100 scale-100" leave-active-class="animate-out"
+      leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
       <div v-if="isMenuOpen" class="menu-panel">
-        <!-- Animation Speed Section -->
+        <!-- Animation Speed Section (not collapsible) -->
         <div class="menu-section">
           <h3>Animationsgeschwindigkeit</h3>
           <div class="speed-toggle">
@@ -86,72 +93,85 @@ onUnmounted(() => {
         </div>
 
         <!-- Dice Colors Section -->
-        <div class="menu-section">
-          <h3>Würfelfarben</h3>
-          <div class="color-controls">
-            <!-- D20 Attribute Colors -->
-            <h4>D20 Attribute</h4>
-            <div class="color-control" v-for="attr in attributes" :key="attr">
-              <label>{{ attr }}</label>
-              <input type="color" :value="diceAppearanceStore.getD20Appearance(CHECK_TYPES.ATTRIBUTE, attr).color"
-                @input="(e) => diceAppearanceStore.updateD20Appearance(CHECK_TYPES.ATTRIBUTE, attr, { color: e.target.value })">
-            </div>
+        <div class="menu-section collapsible">
+          <h3 @click="toggleSection('colors')" class="section-header">
+            Würfelfarben
+            <span class="toggle-icon" :class="{ expanded: expandedSections.colors }">▼</span>
+          </h3>
+          <Transition name="collapse">
+            <div v-show="expandedSections.colors" class="section-content">
+              <div class="color-controls">
+                <!-- D20 Attribute Colors -->
+                <h4>D20 Attribute</h4>
+                <div class="color-control" v-for="attr in attributes" :key="attr">
+                  <label>{{ attr }}</label>
+                  <input type="color" :value="diceAppearanceStore.getD20Appearance(CHECK_TYPES.ATTRIBUTE, attr).color"
+                    @input="(e) => diceAppearanceStore.updateD20Appearance(CHECK_TYPES.ATTRIBUTE, attr, { color: e.target.value })">
+                </div>
 
-            <div class="talent-color-toggle">
-              <label>Talentproben-Farben:</label>
-              <button class="toggle-button" :class="{ active: diceAppearanceStore.preferences.useTalentColors }"
-                @click="diceAppearanceStore.toggleTalentColors">
-                {{ diceAppearanceStore.preferences.useTalentColors ? 'Einheitliche Farbe' : 'Attributfarben' }}
-              </button>
-            </div>
+                <!-- D20 Special Colors -->
+                <h4>D20 Spezial</h4>
+                <div class="color-control">
+                  <label>Talent</label>
+                  <input type="color" :value="diceAppearanceStore.getD20Appearance(CHECK_TYPES.TALENT).color"
+                    @input="(e) => diceAppearanceStore.updateD20Appearance(CHECK_TYPES.TALENT, null, { color: e.target.value })">
+                </div>
+                <div class="color-control">
+                  <label>Kampf</label>
+                  <input type="color" :value="diceAppearanceStore.getD20Appearance(CHECK_TYPES.COMBAT).color"
+                    @input="(e) => diceAppearanceStore.updateD20Appearance(CHECK_TYPES.COMBAT, null, { color: e.target.value })">
+                </div>
 
-            <!-- D20 Special Colors -->
-            <h4>D20 Spezial</h4>
-            <div class="color-control">
-              <label>Talent</label>
-              <input type="color" :value="diceAppearanceStore.getD20Appearance(CHECK_TYPES.TALENT).color"
-                @input="(e) => diceAppearanceStore.updateD20Appearance(CHECK_TYPES.TALENT, null, { color: e.target.value })">
-            </div>
-            <div class="color-control">
-              <label>Kampf</label>
-              <input type="color" :value="diceAppearanceStore.getD20Appearance(CHECK_TYPES.COMBAT).color"
-                @input="(e) => diceAppearanceStore.updateD20Appearance(CHECK_TYPES.COMBAT, null, { color: e.target.value })">
-            </div>
+                <!-- Talent Colors Toggle -->
+                <div class="talent-color-toggle">
+                  <label>Talentproben-Farben:</label>
+                  <button class="toggle-button" :class="{ active: diceAppearanceStore.preferences.useTalentColors }"
+                    @click="diceAppearanceStore.toggleTalentColors">
+                    {{ diceAppearanceStore.preferences.useTalentColors ? 'Einheitliche Farbe' : 'Attributfarben' }}
+                  </button>
+                </div>
 
-            <!-- D6 Colors -->
-            <h4>D6 Würfel</h4>
-            <div class="color-control" v-for="type in d6Types" :key="type">
-              <label>{{ type === 'damage' ? 'Schaden' : type === 'critical' ? 'Kritisch' : 'Extra' }}</label>
-              <input type="color" :value="diceAppearanceStore.getD6Appearance(type).color"
-                @input="(e) => diceAppearanceStore.updateD6Appearance(type, { color: e.target.value })">
-            </div>
+                <!-- D6 Colors -->
+                <h4>D6 Würfel</h4>
+                <div class="color-control" v-for="type in d6Types" :key="type">
+                  <label>{{ type === 'damage' ? 'Schaden' : type === 'critical' ? 'Kritisch' : 'Extra' }}</label>
+                  <input type="color" :value="diceAppearanceStore.getD6Appearance(type).color"
+                    @input="(e) => diceAppearanceStore.updateD6Appearance(type, { color: e.target.value })">
+                </div>
 
-            <button class="reset-colors-button" @click="diceAppearanceStore.resetAppearances">
-              Farben zurücksetzen
-            </button>
-          </div>
+                <button class="reset-colors-button" @click="diceAppearanceStore.resetAppearances">
+                  Farben zurücksetzen
+                </button>
+              </div>
+            </div>
+          </Transition>
         </div>
 
         <!-- Background Section -->
-        <div class="menu-section">
-          <h3>Hintergrund</h3>
-          <button class="background-toggle" :class="{ active: backgroundStore.currentBackground === 'animiert' }"
-            @click="toggleBackground">
-            Hintergrund animiert
-          </button>
-        </div>
+        <div class="menu-section collapsible">
+          <h3 @click="toggleSection('background')" class="section-header">
+            Hintergrund
+            <span class="toggle-icon" :class="{ expanded: expandedSections.background }">▼</span>
+          </h3>
+          <Transition name="collapse">
+            <div v-show="expandedSections.background" class="section-content">
+              <button class="background-toggle" :class="{ active: backgroundStore.currentBackground === 'animiert' }"
+                @click="toggleBackground">
+                Hintergrund animiert
+              </button>
 
-        <div v-if="backgroundStore.currentBackground === 'animiert'" class="menu-section">
-          <div class="color-controls">
-            <div class="color-control">
-              <label>Icosahedron</label>
-              <input type="color" :value="backgroundStore.hexagonColor" @input="updateHexagonColor">
+              <div v-if="backgroundStore.currentBackground === 'animiert'" class="color-controls">
+                <div class="color-control">
+                  <label>Icosahedron</label>
+                  <input type="color" :value="backgroundStore.hexagonColor" @input="updateHexagonColor">
+                </div>
+                <div class="color-control">
+                  <label>Würfel</label>
+                  <input type="color" :value="backgroundStore.squareColor" @input="updateSquareColor">
+                </div>
+              </div>
             </div>
-            <div class="color-control">
-              <label>Würfel</label>
-              <input type="color" :value="backgroundStore.squareColor" @input="updateSquareColor">
-            </div>
-          </div>
+          </Transition>
         </div>
       </div>
     </Transition>
@@ -426,5 +446,49 @@ onUnmounted(() => {
 .toggle-button.active {
   background: #42b983;
   border-color: #42b983;
+}
+
+.section-header {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+.toggle-icon {
+  font-size: 0.8rem;
+  transition: transform 0.3s ease;
+  transform: rotate(-90deg);
+}
+
+.toggle-icon.expanded {
+  transform: rotate(0);
+}
+
+.section-content {
+  overflow: hidden;
+}
+
+.collapse-enter-active,
+.collapse-leave-active {
+  transition: all 0.3s ease;
+  max-height: 1000px;
+  opacity: 1;
+}
+
+.collapse-enter-from,
+.collapse-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* Adjustments to existing styles */
+.menu-section.collapsible {
+  padding-bottom: 0;
+}
+
+.menu-section.collapsible .section-content {
+  padding: 0.5rem 0;
 }
 </style>
