@@ -19,19 +19,17 @@ const rotationSpeed = 0.005/2 // Rotations per second
 function createHexagon() {
   const geometry = new THREE.IcosahedronGeometry(4)
   const material = new THREE.MeshPhysicalMaterial({
-    color: 0x258141,           // Antique gold base color
-    metalness: 0.9,            // High metalness for strong specular
-    roughness: 0.1,            // Low roughness for sharp reflections
-    clearcoat: 1.0,            // Maximum clearcoat for extra shine
-    clearcoatRoughness: 0.1,   // Sharp clearcoat reflections
-    reflectivity: 1,           // Maximum reflectivity
-    flatShading: false,        // Smooth shading
-    envMapIntensity: 1.0       // Full environment map intensity
+    color: 0x258141,
+    metalness: 0.9,            // Higher metalness for stronger specular
+    roughness: 0.1,            // Lower roughness for sharper reflections
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.01,  // Much lower for sharper clearcoat reflections
+    reflectivity: 1,
+    flatShading: false,
+    envMapIntensity: 1.0
   })
   
   const mesh = new THREE.Mesh(geometry, material)
-  
-  // Add random rotation speeds as custom properties
   mesh.userData.rotationSpeed = {
     x: (Math.random() - 0.5) * 0.001,
     y: (Math.random() - 0.5) * 0.001,
@@ -45,19 +43,17 @@ function createHexagon() {
 function createSquare() {
   const geometry = new THREE.BoxGeometry(6, 6, 6)
   const material = new THREE.MeshPhysicalMaterial({
-    color: 0x331127,           // Antique gold base color
-    metalness: 0.9,            // High metalness for strong specular
-    roughness: 0.1,            // Low roughness for sharp reflections
-    clearcoat: 1.0,            // Maximum clearcoat for extra shine
-    clearcoatRoughness: 0.1,   // Sharp clearcoat reflections
-    reflectivity: 1,           // Maximum reflectivity
-    flatShading: false,        // Smooth shading
-    envMapIntensity: 1.0       // Full environment map intensity
+    color: 0x331127,
+    metalness: 0.9,            // Higher metalness for stronger specular
+    roughness: 0.1,            // Lower roughness for sharper reflections
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.01,  // Much lower for sharper clearcoat reflections
+    reflectivity: 1,
+    flatShading: false,
+    envMapIntensity: 1.0
   })
   
   const mesh = new THREE.Mesh(geometry, material)
-  
-  // Add random rotation speeds as custom properties
   mesh.userData.rotationSpeed = {
     x: (Math.random() - 0.5) * 0.001,
     y: (Math.random() - 0.5) * 0.001,
@@ -67,7 +63,27 @@ function createSquare() {
   return mesh
 }
 
-// Create shapes arranged in a circle
+function createHighlightLight(position) {
+  const light = new THREE.SpotLight(0xffffff, 150)
+  light.position.set(400, 400, 200)  // Fixed position in top-right
+  light.angle = Math.PI / 6           // 30 degrees
+  light.penumbra = 0.1
+  light.decay = 0.5
+  light.distance = 1500
+  
+  // Create target object that will follow the shape
+  const target = new THREE.Object3D()
+  target.position.copy(position)
+  scene.add(target)
+  light.target = target
+  
+  // Don't cast shadows from these individual lights to save performance
+  light.castShadow = false
+  
+  return { light, target }
+}
+
+// Modified createShapes function
 function createShapes() {
   const numShapes = 40
   const radius = 120
@@ -78,8 +94,16 @@ function createShapes() {
     
     // Position shape in a circle
     const angle = (i / numShapes) * Math.PI * 2
-    shape.position.x = Math.cos(angle) * radius
-    shape.position.y = Math.sin(angle) * radius
+    const x = Math.cos(angle) * radius
+    const y = Math.sin(angle) * radius
+    shape.position.set(x, y, 0)
+    
+    // Create dedicated spotlight for this shape
+    const { light, target } = createHighlightLight(shape.position)
+    scene.add(light)
+    
+    // Store the target reference with the shape for updates
+    shape.userData.lightTarget = target
     
     shapes.push(shape)
     circleGroup.add(shape)
@@ -101,7 +125,7 @@ function initScene() {
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setClearColor(0x000000, 0)
   renderer.setPixelRatio(window.devicePixelRatio)
-  renderer.physicallyCorrectLights = true // Enable physically correct lighting
+  renderer.physicallyCorrectLights = true
   
   const canvas = renderer.domElement
   canvas.addEventListener('contextmenu', (e) => {
@@ -113,98 +137,64 @@ function initScene() {
   // Setup camera
   camera.position.z = 600
   camera.position.y = -30
-  
-  // Setup lighting with much brighter intensities
-  // Main spotlight with very high intensity
-  const mainLight = new THREE.SpotLight(0xffffff, 8)
-  mainLight.position.set(1, 1, 1).multiplyScalar(600)
-  mainLight.angle = Math.PI / 2
-  mainLight.penumbra = 0.1 // Sharper edge for more defined highlights
-  mainLight.decay = 0.1 // Less decay for stronger light at distance
-  mainLight.distance = 2000
-  scene.add(mainLight)
 
-  // Front spotlight with increased intensity
-  const frontLight = new THREE.SpotLight(0xffffff, 5)
-  frontLight.position.set(0, 0, 1).multiplyScalar(600)
-  frontLight.angle = Math.PI / 2
-  frontLight.penumbra = 0.1
-  frontLight.decay = 0.1
-  frontLight.distance = 2000
-  scene.add(frontLight)
+  // Create a camera-following spot light for front-facing specular highlights
+  const keyLight = new THREE.RectAreaLight(0xffffff, 40, 1000, 1000)
+  keyLight.position.set(400, 400, 200)
+  keyLight.lookAt(0, 60, 0)
+  scene.add(keyLight)
 
-  // Right spotlight with increased intensity
-  const rightLight = new THREE.SpotLight(0xffffff, 5)
-  rightLight.position.set(1, 0, 0).multiplyScalar(600)
-  rightLight.angle = Math.PI / 2
-  rightLight.penumbra = 0.1
-  rightLight.decay = 0.1
-  rightLight.distance = 2000
-  scene.add(rightLight)
+  // Camera-following fill light
+  const frontSpotLight = new THREE.SpotLight(0xffffff, 100)
+  frontSpotLight.angle = Math.PI / 4
+  frontSpotLight.penumbra = 0.2
+  frontSpotLight.decay = 0.5
+  frontSpotLight.distance = 1500
+  scene.add(frontSpotLight)
 
-  // Top spotlight
-  const topLight = new THREE.SpotLight(0xffffff, 4)
-  topLight.position.set(0, 1, 0).multiplyScalar(600)
-  topLight.angle = Math.PI / 2
-  topLight.penumbra = 0.1
-  topLight.decay = 0.1
-  topLight.distance = 2000
-  scene.add(topLight)
+  const frontTarget = new THREE.Object3D()
+  scene.add(frontTarget)
+  frontSpotLight.target = frontTarget
 
-  // Bottom spotlight
-  const bottomLight = new THREE.SpotLight(0xffffff, 4)
-  bottomLight.position.set(0, -1, 0).multiplyScalar(600)
-  bottomLight.angle = Math.PI / 2
-  bottomLight.penumbra = 0.1
-  bottomLight.decay = 0.1
-  bottomLight.distance = 2000
-  scene.add(bottomLight)
-
-  // Back spotlight
-  const backLight = new THREE.SpotLight(0xffffff, 4)
-  backLight.position.set(0, 0, -1).multiplyScalar(600)
-  backLight.angle = Math.PI / 2
-  backLight.penumbra = 0.1
-  backLight.decay = 0.1
-  backLight.distance = 2000
-  scene.add(backLight)
-
-  // Corner spotlights with increased intensity for better highlights
-  const topCornerLight = new THREE.SpotLight(0xffffff, 3)
-  topCornerLight.position.set(1, 1, -1).multiplyScalar(600)
-  topCornerLight.angle = Math.PI / 2
-  topCornerLight.penumbra = 0.1
-  topCornerLight.decay = 0.1
-  topCornerLight.distance = 2000
-  scene.add(topCornerLight)
-
-  const bottomCornerLight = new THREE.SpotLight(0xffffff, 3)
-  bottomCornerLight.position.set(-1, -1, 1).multiplyScalar(600)
-  bottomCornerLight.angle = Math.PI / 2
-  bottomCornerLight.penumbra = 0.1
-  bottomCornerLight.decay = 0.1
-  bottomCornerLight.distance = 2000
-  scene.add(bottomCornerLight)
-
-  // Much brighter ambient light
-  const ambientLight = new THREE.AmbientLight(0xffffff, 6)
+  // Ambient light for base illumination
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.5)
   scene.add(ambientLight)
 
-  // Configure shadows with higher resolution
-  const spotLights = [
-    mainLight, frontLight, rightLight, topLight, 
-    bottomLight, backLight, topCornerLight, bottomCornerLight
-  ]
+  function updateLights() {
+    // Update camera-following light
+    frontSpotLight.position.copy(camera.position)
+    frontSpotLight.position.y += 50
+    frontTarget.position.set(0, 60, 0)
+    
+    // Update individual spotlight targets
+    shapes.forEach((shape) => {
+      if (shape.userData.lightTarget) {
+        // Convert shape's world position to the target position
+        const worldPos = new THREE.Vector3()
+        shape.getWorldPosition(worldPos)
+        shape.userData.lightTarget.position.copy(worldPos)
+      }
+    })
+  }
 
-  spotLights.forEach(light => {
-    light.castShadow = true
-    light.shadow.mapSize.width = 1024 // Higher resolution shadows
-    light.shadow.mapSize.height = 1024
-    light.shadow.camera.near = 0.5
-    light.shadow.camera.far = 2000
-    light.shadow.bias = -0.0001 // Reduced shadow bias for sharper shadows
-    light.shadow.radius = 1 // Slightly softer shadow edges
-  })
+  // Modified animate function
+  animate = function() {
+    if (!isAnimating) return
+    
+    requestAnimationFrame(animate)
+    updateLights()
+    
+    const delta = clock.getDelta()
+    circleGroup.rotation.z += rotationSpeed * delta * Math.PI * 2
+    
+    shapes.forEach((shape) => {
+      shape.rotation.x += shape.userData.rotationSpeed.x
+      shape.rotation.y += shape.userData.rotationSpeed.y
+      shape.rotation.z += shape.userData.rotationSpeed.z
+    })
+    
+    renderer.render(scene, camera)
+  }
   
   // Create group for shapes
   circleGroup = new THREE.Group()
