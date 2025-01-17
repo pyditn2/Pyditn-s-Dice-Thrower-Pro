@@ -8,12 +8,14 @@ import { useDiceState } from '../composables/useDiceState'
 import { useSceneSystem } from '../composables/useSceneSystem'
 import { usePhysicsSystem } from '../composables/usePhysicsSystem'
 import { useAnimationSystem } from '../composables/useAnimationSystem'
+import { useAudioSystem } from '../composables/useAudioSystem'
 
 // Initialize composables
 const diceState = useDiceState()
 const sceneSystem = useSceneSystem()
 const physicsSystem = usePhysicsSystem()
 const animationSystem = useAnimationSystem()
+const audioSystem = useAudioSystem()
 
 // Container refs management
 const containerElements = []
@@ -182,12 +184,19 @@ onMounted(async () => {
   try {
     await RAPIER.init()
     await sceneSystem.initScene()
+    await audioSystem.initAudio()
 
     cameraManager = new CameraManager(sceneSystem.scene.value, 300, 300)
     physicsSystem.resetPhysicsState()
+    
+    // Setup collision events after world initialization
+    physicsSystem.setupCollisionEvents(sceneSystem.world.value)
 
     animationSystem.startAnimation(animate)
     window.addEventListener('keydown', handleKeydown)
+    
+    // Add click listener to resume audio context
+    window.addEventListener('click', audioSystem.resumeAudioContext)
   } catch (error) {
     console.error('Error in mounted hook:', error)
   }
@@ -196,6 +205,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   animationSystem.stopAnimation()
   window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('click', audioSystem.resumeAudioContext)
 
   // Cleanup renderers
   diceState.renderers.value.forEach(renderer => {
@@ -218,10 +228,28 @@ defineExpose({
   resetCamera,
   updateViewMode: diceState.updateViewMode
 })
+
+const testDiceSound = () => {
+  audioSystem.resumeAudioContext()
+  audioSystem.testPlayDiceSound()
+}
+
+const testBowlSound = () => {
+  audioSystem.resumeAudioContext()
+  audioSystem.testPlayBowlSound()
+}
 </script>
 
 <template>
   <div class="dice-views-container" :class="`dice-count-${maxDiceCount}`">
+    <div class="audio-test-controls" style="margin-bottom: 1rem;">
+      <button @click="testDiceSound" style="margin-right: 1rem; padding: 0.5rem;">
+        Test Dice Sound
+      </button>
+      <button @click="testBowlSound" style="padding: 0.5rem;">
+        Test Bowl Sound
+      </button>
+    </div>
     <div class="dice-views">
       <div v-for="n in maxDiceCount" :key="n" :ref="el => initializeContainer(el, n - 1)" class="dice-container"
         v-show="n === 1 || (diceState.showExtraViews && n <= diceState.dice.value.length)"></div>
