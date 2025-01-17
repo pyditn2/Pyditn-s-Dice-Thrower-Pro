@@ -124,12 +124,15 @@ onUnmounted(() => {
 
                 <!-- Talent Colors Toggle -->
                 <div class="talent-color-toggle">
-                  <label>Talentproben-Farben:</label>
-                  <button class="toggle-button" :class="{ active: diceAppearanceStore.preferences.useTalentColors }"
-                    @click="diceAppearanceStore.toggleTalentColors">
-                    {{ diceAppearanceStore.preferences.useTalentColors ? 'Einheitliche Farbe' : 'Attributfarben' }}
-                  </button>
-                </div>
+  <label>Talentproben-Farben:</label>
+  <button 
+    class="toggle-button" 
+    :class="{ active: !diceAppearanceStore.preferences.useTalentColors }"
+    @click="diceAppearanceStore.toggleTalentColors"
+  >
+    {{ diceAppearanceStore.preferences.useTalentColors ? 'Einheitliche Farbe' : 'Attributfarben' }}
+  </button>
+</div>
 
                 <!-- D6 Colors -->
                 <h4>D6 Würfel</h4>
@@ -490,5 +493,55 @@ onUnmounted(() => {
 
 .menu-section.collapsible .section-content {
   padding: 0.5rem 0;
+}
+
+.menu-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: #222;
+  border-radius: 4px;
+  padding: 1rem;
+  min-width: 200px;
+  max-height: 80vh; /* Limit height to 80% of viewport height */
+  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  transform-origin: top right;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #444 #222; /* Firefox */
+}
+
+/* Webkit (Chrome, Safari, Edge) scrollbar styling */
+.menu-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.menu-panel::-webkit-scrollbar-track {
+  background: #222;
+  border-radius: 4px;
+}
+
+.menu-panel::-webkit-scrollbar-thumb {
+  background-color: #444;
+  border-radius: 4px;
+  border: 2px solid #222;
+}
+
+.menu-panel::-webkit-scrollbar-thumb:hover {
+  background-color: #555;
+}
+
+/* Ensure menu doesn't go off-screen on smaller heights */
+@media screen and (max-height: 800px) {
+  .menu-panel {
+    max-height: 70vh;
+  }
+}
+
+@media screen and (max-height: 600px) {
+  .menu-panel {
+    max-height: 60vh;
+  }
 }
 </style>

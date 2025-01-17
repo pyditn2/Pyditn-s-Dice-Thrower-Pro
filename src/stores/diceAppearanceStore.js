@@ -40,7 +40,7 @@ export const useDiceAppearanceStore = defineStore('diceAppearance', () => {
   // Initialize state
   const appearances = ref(loadFromStorage('diceAppearances', defaultAppearances))
   const preferences = ref(loadFromStorage('diceAppearancePrefs', {
-    useTalentColors: false  // false = use attribute colors, true = use talent color
+    useTalentColors: true  // false = use attribute colors, true = use talent color
   }))
 
   // Watch for changes and save to localStorage
