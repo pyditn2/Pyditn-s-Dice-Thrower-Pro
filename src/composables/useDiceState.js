@@ -67,7 +67,7 @@ export const useDiceState = () => {
     settledDice.value.clear()
   }
 
-  const createDiceInstance = (type, index, count, world) => {
+  const createDiceInstance = (type, index, count, world, appearance = null) => {
     try {
       const offset = {
         x: (index - (count - 1) / 2) * DICE_INITIAL_CONFIG.spacing,
@@ -76,8 +76,8 @@ export const useDiceState = () => {
         z: Math.random() - 0.5
       }
 
-      // Use DiceManager to create the dice
-      const { mesh, rigidBody } = diceManager.createDice(type, world)
+      // Pass appearance to DiceManager
+      const { mesh, rigidBody } = diceManager.createDice(type, world, appearance)
       
       mesh.position.set(offset.x, offset.y, offset.z)
       rigidBody.setTranslation(offset)

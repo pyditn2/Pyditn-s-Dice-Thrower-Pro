@@ -8,12 +8,14 @@ import { useDiceState } from '../composables/useDiceState'
 import { useSceneSystem } from '../composables/useSceneSystem'
 import { usePhysicsSystem } from '../composables/usePhysicsSystem'
 import { useAnimationSystem } from '../composables/useAnimationSystem'
+import { useAudioSystem } from '../composables/useAudioSystem'
 
 // Initialize composables
 const diceState = useDiceState()
 const sceneSystem = useSceneSystem()
 const physicsSystem = usePhysicsSystem()
 const animationSystem = useAnimationSystem()
+const audioSystem = useAudioSystem()
 
 // Container refs management
 const containerElements = []
@@ -107,7 +109,7 @@ const initializeContainer = (el, index) => {
   }
 }
 
-const rollDice = async (type, count) => {
+const rollDice = async (type, count, appearance = null) => {
   try {
     if (count > maxDiceCount.value) {
       maxDiceCount.value = count
@@ -128,9 +130,12 @@ const rollDice = async (type, count) => {
       }
     }
 
+    // Handle array of appearances for multiple dice
+    const appearances = Array.isArray(appearance) ? appearance : Array(count).fill(appearance)
+
     for (let i = 0; i < count; i++) {
       const { mesh, rigidBody } = diceState.createDiceInstance(
-        type, i, count, sceneSystem.world.value
+        type, i, count, sceneSystem.world.value, appearances[i]
       )
       sceneSystem.scene.value.add(mesh)
       diceState.dice.value.push(mesh)
@@ -146,11 +151,9 @@ const rollDice = async (type, count) => {
           )
           if (allSettled) {
             clearInterval(checkSettled)
-            // Get results using DiceManager's getUpFacingNumber
             const results = diceState.dice.value.map(die =>
               diceState.diceManager.getUpFacingNumber(die)
             )
-            console.log("Settled dice results:", results) // Debug log
             resolve(results)
           }
         } catch (error) {
@@ -181,12 +184,19 @@ onMounted(async () => {
   try {
     await RAPIER.init()
     await sceneSystem.initScene()
+    await audioSystem.initAudio()
 
     cameraManager = new CameraManager(sceneSystem.scene.value, 300, 300)
     physicsSystem.resetPhysicsState()
+    
+    // Setup collision events after world initialization
+    physicsSystem.setupCollisionEvents(sceneSystem.world.value)
 
     animationSystem.startAnimation(animate)
     window.addEventListener('keydown', handleKeydown)
+    
+    // Add click listener to resume audio context
+    window.addEventListener('click', audioSystem.resumeAudioContext)
   } catch (error) {
     console.error('Error in mounted hook:', error)
   }
@@ -195,6 +205,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   animationSystem.stopAnimation()
   window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('click', audioSystem.resumeAudioContext)
 
   // Cleanup renderers
   diceState.renderers.value.forEach(renderer => {

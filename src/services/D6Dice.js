@@ -47,7 +47,11 @@ export class D6Dice extends BaseDice {
     return label
   }
 
-  createDice(world) {
+  createDice(world, appearance = null) {
+    if (appearance) {
+      this.setAppearance(appearance)
+    }
+
     const geometry = new THREE.BoxGeometry(1, 1, 1)
     const mesh = this.createBaseMesh(geometry)
     const startY = 6
@@ -62,25 +66,37 @@ export class D6Dice extends BaseDice {
   }
 
   addNumbersToMesh(mesh) {
-    console.log("Adding numbers to D6"); // Debug log
-    this.diceNumbers = [];
+    this.diceNumbers = []
     
     this.layout.forEach((number, i) => {
-      console.log(`Adding number ${number} with normal:`, this.normals[i]); // Debug log
       const label = this.createFaceLabel(
         number,
         this.centers[i],
         this.normals[i]
-      );
+      )
       
-      mesh.add(label);
+      mesh.add(label)
       
       this.diceNumbers.push({
         number: number,
-        normal: this.normals[i].clone() // Make sure to clone the normal
-      });
-    });
+        normal: this.normals[i].clone()
+      })
+    })
+  }
+
+  // Method to update appearance after creation
+  updateDiceAppearance(mesh, appearance) {
+    if (!mesh) return
     
-    console.log("Final dice numbers:", this.diceNumbers); // Debug log
+    // Update the base mesh appearance
+    this.updateAppearance(mesh, appearance)
+    
+    // Update labels if needed
+    mesh.children.forEach(label => {
+      if (label.isMesh && label.material) {
+        // You might want to update label appearance properties here
+        // For now, we'll keep labels with their default appearance
+      }
+    })
   }
 }

@@ -2,17 +2,106 @@ import { ref } from 'vue'
 import * as THREE from 'three'
 import { SETTLE_THRESHOLD } from '../constants/diceTypes'
 import { usePhysicsStore } from '../stores/physicsStore'
+import { useAudioSystem } from './useAudioSystem'
+import RAPIER from '@dimforge/rapier3d-compat'
 
 export const usePhysicsSystem = () => {
   const physicsStore = usePhysicsStore()
+  const audioSystem = useAudioSystem()
   const previousState = ref(new Map())
   const currentState = ref(new Map())
   const lastTime = ref(0)
   const accumulator = ref(0)
-  
-  const MAX_SUBSTEPS = 3
+  let eventQueue = null
+  let lastCollisionTime = 0
+  const COLLISION_COOLDOWN = 50 // milliseconds
+
+  const setupCollisionEvents = (world) => {
+    //console.log('Setting up collision events...')
+    eventQueue = new RAPIER.EventQueue(true)
+  }
+
+  const handleCollisions = (world) => {
+    if (!eventQueue || !world) return
+    
+    world.forEachCollider(collider => {
+      if (!collider.parent()) return
+      collider.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS)
+    })
+    
+    const currentTime = performance.now()
+    
+    eventQueue.drainCollisionEvents((handle1, handle2, started) => {
+      if (!started) return // Silently skip end events
+      
+      const collider1 = world.getCollider(handle1)
+      const collider2 = world.getCollider(handle2)
+      
+      if (!collider1 || !collider2) return
+      
+      const body1 = collider1.parent()
+      const body2 = collider2.parent()
+      
+      if (!body1 || !body2) return
+      
+      const vel1 = body1.linvel()
+      const vel2 = body2.linvel()
+      
+      const relativeVelocity = new THREE.Vector3(
+        vel1.x - vel2.x,
+        vel1.y - vel2.y,
+        vel1.z - vel2.z
+      )
+      
+      const speed = relativeVelocity.length()
+      const isBowlCollision = body1.isFixed() || body2.isFixed()
+      
+      // Skip if too soon after last collision
+      if (currentTime - lastCollisionTime < COLLISION_COOLDOWN) {
+        //console.log('Skipping collision (cooldown)')
+        return
+      }
+      
+      if (speed < 0.1) {
+        //console.log('Speed too low for sound:', speed)
+        return
+      }
+
+      // Scale the speed to a reasonable volume range (0.1 to 1.0)
+      const volume = Math.min(Math.max(speed / 20, 0.1), 1.0)
+      
+      // Update last collision time
+      lastCollisionTime = currentTime
+      
+      // Resume audio context and play sound
+      audioSystem.resumeAudioContext()
+      audioSystem.playCollisionSound(volume, isBowlCollision)
+    })
+  }
+
+  const updatePhysics = (world, deltaTime) => {
+    if (!world) return 0
+    
+    const timeStep = physicsStore.currentTimeStep
+    accumulator.value += deltaTime
+    
+    let stepCount = 0
+    while (accumulator.value >= timeStep) {
+      world.step(eventQueue)
+      handleCollisions(world)
+      
+      accumulator.value -= timeStep
+      stepCount++
+      
+      if (stepCount >= 3) break
+    }
+    
+    return accumulator.value / timeStep
+  }
 
   const isDiceSettled = (rigidBody) => {
+    if (!rigidBody) return true
+    
     const vel = rigidBody.linvel()
     const angVel = rigidBody.angvel()
     
@@ -26,19 +115,6 @@ export const usePhysicsSystem = () => {
     return settled
   }
 
-  const updatePhysics = (world, deltaTime) => {
-    const timeStep = physicsStore.currentTimeStep
-    accumulator.value += deltaTime
-    
-    while (accumulator.value >= timeStep) {
-      world.step()
-      accumulator.value -= timeStep
-    }
-    
-    return accumulator.value / timeStep
-  }
-
-  // Rest of the functions remain the same
   const storePhysicsState = (rigidBodies) => {
     rigidBodies.forEach((rb, index) => {
       if (rb) {
@@ -91,6 +167,7 @@ export const usePhysicsSystem = () => {
     currentState.value.clear()
     lastTime.value = 0
     accumulator.value = 0
+    eventQueue = null
   }
 
   return {
@@ -100,6 +177,7 @@ export const usePhysicsSystem = () => {
     updateCurrentState,
     interpolateVisualState,
     resetPhysicsState,
+    setupCollisionEvents,
     lastTime,
   }
 }

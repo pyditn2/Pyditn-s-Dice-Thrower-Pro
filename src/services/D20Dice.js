@@ -44,7 +44,11 @@ export class D20Dice extends BaseDice {
     return label
   }
 
-  createDice(world) {
+  createDice(world, appearance = null) {
+    if (appearance) {
+      this.setAppearance(appearance)
+    }
+
     const geometry = new THREE.IcosahedronGeometry(1)
     const mesh = this.createBaseMesh(geometry)
     const startY = 6
@@ -59,34 +63,31 @@ export class D20Dice extends BaseDice {
   }
 
   addNumbersToMesh(mesh) {
-    console.log("Adding numbers to D20"); // Debug log
-    this.diceNumbers = [];
+    this.diceNumbers = []
     
-    const geometry = mesh.geometry;
-    const positions = geometry.attributes.position.array;
-    const faceNormals = [];
-    const faceCenters = [];
+    const geometry = mesh.geometry
+    const positions = geometry.attributes.position.array
+    const faceNormals = []
+    const faceCenters = []
     
     // Calculate face centers and normals
     for (let i = 0; i < positions.length; i += 9) {
-      const v1 = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2]);
-      const v2 = new THREE.Vector3(positions[i + 3], positions[i + 4], positions[i + 5]);
-      const v3 = new THREE.Vector3(positions[i + 6], positions[i + 7], positions[i + 8]);
+      const v1 = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2])
+      const v2 = new THREE.Vector3(positions[i + 3], positions[i + 4], positions[i + 5])
+      const v3 = new THREE.Vector3(positions[i + 6], positions[i + 7], positions[i + 8])
       
-      const normal = new THREE.Vector3();
-      const center = new THREE.Vector3();
+      const normal = new THREE.Vector3()
+      const center = new THREE.Vector3()
       
       normal.crossVectors(
         v2.clone().sub(v1),
         v3.clone().sub(v1)
-      ).normalize();
+      ).normalize()
       
-      center.add(v1).add(v2).add(v3).divideScalar(3);
+      center.add(v1).add(v2).add(v3).divideScalar(3)
       
-      faceNormals.push(normal);
-      faceCenters.push(center);
-      
-      console.log(`Face ${i/9} center:`, center, "normal:", normal); // Debug log
+      faceNormals.push(normal)
+      faceCenters.push(center)
     }
     
     this.layout.forEach((number, i) => {
@@ -95,19 +96,15 @@ export class D20Dice extends BaseDice {
           number,
           faceCenters[i],
           faceNormals[i]
-        );
+        )
         
-        mesh.add(label);
+        mesh.add(label)
         
         this.diceNumbers.push({
           number: number,
-          normal: faceNormals[i].clone() // Make sure to clone the normal
-        });
-        
-        console.log(`Added number ${number} with normal:`, faceNormals[i]); // Debug log
+          normal: faceNormals[i].clone()
+        })
       }
-    });
-    
-    console.log("Final dice numbers:", this.diceNumbers); // Debug log
+    })
   }
 }

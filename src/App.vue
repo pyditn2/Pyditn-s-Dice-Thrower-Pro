@@ -45,7 +45,8 @@ const activeTab = ref('dice')
 html, body {
   margin: 0;
   padding: 0;
-  background-color: transparent; /* Changed from #000000 */
+  height: 100%;
+  background-color: transparent;
   color: #ffffff;
 }
 
@@ -53,32 +54,35 @@ html, body {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
-  min-height: 100vh;
-  background-color: transparent; /* Changed from #000000 */
+  height: 100vh;
+  background-color: transparent;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
-/* Add a semi-transparent background to content areas for better readability */
 .tab-content {
   padding: 1rem;
   color: #ffffff;
-  background-color: rgba(0, 0, 0, 0.5); /* Added semi-transparent background */
+  background-color: rgba(0, 0, 0, 0.5);
   border-radius: 8px;
+  min-width: min-content;
 }
 
-/* Rest of your styles remain the same */
 .tab-navigation {
   display: flex;
   gap: 1rem;
   border-bottom: 1px solid #333;
   padding-bottom: 0.5rem;
   justify-content: center;
-  margin: auto auto 1rem;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .tab-button {
   padding: 0.5rem 1rem;
-  background-color: rgba(51, 51, 51, 0.8); /* Made slightly transparent */
+  background-color: rgba(51, 51, 51, 0.8); 
   color: #ffffff;
   border: none;
   cursor: pointer;
@@ -87,18 +91,17 @@ html, body {
 }
 
 .tab-button:hover {
-  background-color: rgba(68, 68, 68, 0.8); /* Made slightly transparent */
+  background-color: rgba(68, 68, 68, 0.8); 
 }
 
 .tab-button.active {
-  background-color: rgba(0, 0, 0, 0.8); /* Made slightly transparent */
+  background-color: rgba(0, 0, 0, 0.8); 
   border-bottom: 2px solid #42b983;
   font-weight: bold;
 }
 
-/* You might want to add some transparency to other UI elements as well */
 button, input, select {
-  background-color: rgba(51, 51, 51, 0.8); /* Made slightly transparent */
+  background-color: rgba(51, 51, 51, 0.8); 
   color: #ffffff;
   border: 1px solid #444444;
   border-radius: 4px;
@@ -106,7 +109,7 @@ button, input, select {
 }
 
 button:hover {
-  background-color: rgba(68, 68, 68, 0.8); /* Made slightly transparent */
+  background-color: rgba(68, 68, 68, 0.8); 
 }
 
 .tab-button.active {
