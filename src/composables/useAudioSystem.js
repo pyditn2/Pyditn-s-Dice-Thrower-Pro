@@ -1,59 +1,59 @@
 import { ref } from 'vue'
 
 export const useAudioSystem = () => {
-  const audioContext = ref(null)
+  const audioContext = ref(new (window.AudioContext || window.webkitAudioContext)())
   const diceCollisionBuffer = ref(null)
   const bowlCollisionBuffer = ref(null)
+  let lastPlayTime = 0
+  let isInitialized = false
+  const isMuted = ref(false)
+
+  const getRandomVariation = (min, max) => {
+    return Math.random() * (max - min) + min
+  }
   
   const loadAudioFile = async (url, soundName) => {
+    if (!audioContext.value) {
+      console.error('AudioContext not available during loadAudioFile')
+      return null
+    }
+
     console.log(`Attempting to load ${soundName} from ${url}`)
     try {
       const response = await fetch(url)
-      console.log(`${soundName} response status:`, response.status)
-      console.log(`${soundName} response headers:`, Object.fromEntries(response.headers))
-      
       const arrayBuffer = await response.arrayBuffer()
-      console.log(`${soundName} file size:`, arrayBuffer.byteLength, 'bytes')
-      
-      // Log the first few bytes to check file header
-      const firstBytes = new Uint8Array(arrayBuffer.slice(0, 16))
-      console.log(`${soundName} first bytes:`, Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join(' '))
-      
       const audioBuffer = await audioContext.value.decodeAudioData(arrayBuffer)
-      console.log(`${soundName} successfully decoded:`, {
+      console.log(`${soundName} loaded:`, {
         duration: audioBuffer.duration,
-        numberOfChannels: audioBuffer.numberOfChannels,
+        channels: audioBuffer.numberOfChannels,
         sampleRate: audioBuffer.sampleRate
       })
-      
       return audioBuffer
     } catch (error) {
       console.error(`Error loading ${soundName}:`, error)
-      console.error('Error details:', error.message)
       return null
     }
   }
   
   const initAudio = async () => {
+    if (isInitialized) return
+    
     console.log('Initializing audio system...')
+    console.log('AudioContext state:', audioContext.value.state)
     
     try {
-      audioContext.value = new (window.AudioContext || window.webkitAudioContext)()
-      console.log('AudioContext created:', audioContext.value.state)
+      if (audioContext.value.state === 'suspended') {
+        await audioContext.value.resume()
+      }
       
-      // Load dice collision sound
       diceCollisionBuffer.value = await loadAudioFile('/sounds/dice-collision.mp3', 'dice sound')
-      
-      // Load bowl collision sound
       bowlCollisionBuffer.value = await loadAudioFile('/sounds/dice-bowl.mp3', 'bowl sound')
       
-      console.log('Audio initialization complete:', {
-        diceSound: diceCollisionBuffer.value ? 'loaded' : 'failed',
-        bowlSound: bowlCollisionBuffer.value ? 'loaded' : 'failed'
-      })
-      
+      isInitialized = true
+      console.log('Audio initialization complete')
     } catch (error) {
-      console.error('Critical error in audio initialization:', error)
+      console.error('Error in audio initialization:', error)
+      isInitialized = false
     }
   }
   
@@ -107,18 +107,90 @@ export const useAudioSystem = () => {
     }
   }
 
-  const resumeAudioContext = () => {
-    if (audioContext.value?.state === 'suspended') {
-      audioContext.value.resume()
-        .then(() => console.log('AudioContext resumed successfully'))
-        .catch(error => console.error('Error resuming AudioContext:', error))
+  const resumeAudioContext = async () => {
+    if (!audioContext.value) return
+    
+    if (audioContext.value.state === 'suspended') {
+      try {
+        await audioContext.value.resume()
+      } catch (error) {
+        console.error('Failed to resume AudioContext:', error)
+      }
     }
   }
-  
+
+  const playCollisionSound = async (volume, isBowlCollision = false) => {
+    // Check mute state first and log it
+    //console.log('Attempting to play sound. Muted:', isMuted.value)
+    
+    if (isMuted.value) {
+      console.log('Sound is muted, skipping playback')
+      return
+    }
+
+    await resumeAudioContext()
+    
+    if (!audioContext.value) {
+      console.log('No audio context available')
+      return
+    }
+    
+    const buffer = isBowlCollision ? bowlCollisionBuffer.value : diceCollisionBuffer.value
+    if (!buffer) {
+      console.log('No buffer available')
+      return
+    }
+    
+    try {
+      //console.log('Creating audio nodes...')
+      const source = audioContext.value.createBufferSource()
+      const gainNode = audioContext.value.createGain()
+      
+      // Add variations based on collision type
+      if (isBowlCollision) {
+        source.playbackRate.value = getRandomVariation(0.9, 1.1)
+        source.detune.value = getRandomVariation(-100, 100)
+      } else {
+        source.playbackRate.value = getRandomVariation(0.8, 1.2)
+        source.detune.value = getRandomVariation(-200, 200)
+      }
+      
+      source.buffer = buffer
+      
+      // Volume envelope with attack and release
+      const attack = 0.005
+      const release = isBowlCollision ? 0.15 : 0.1
+      
+      gainNode.gain.setValueAtTime(0, audioContext.value.currentTime)
+      gainNode.gain.linearRampToValueAtTime(volume, audioContext.value.currentTime + attack)
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.value.currentTime + attack + release)
+      
+      source.connect(gainNode)
+      gainNode.connect(audioContext.value.destination)
+      
+      source.start(0)
+      lastPlayTime = performance.now()
+      
+      //console.log('Sound played successfully')
+    } catch (error) {
+      console.error('Error playing collision sound:', error)
+    }
+  }
+
+  const toggleMute = () => {
+    isMuted.value = !isMuted.value
+    console.log('Audio ' + (isMuted.value ? 'muted' : 'unmuted'))
+  }
+
+  initAudio()
+
   return {
     initAudio,
     testPlayDiceSound,
     testPlayBowlSound,
-    resumeAudioContext
+    resumeAudioContext,
+    playCollisionSound,
+    isMuted: isMuted,
+    toggleMute
   }
 }

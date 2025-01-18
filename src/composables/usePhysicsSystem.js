@@ -13,35 +13,37 @@ export const usePhysicsSystem = () => {
   const lastTime = ref(0)
   const accumulator = ref(0)
   let eventQueue = null
-  
+  let lastCollisionTime = 0
+  const COLLISION_COOLDOWN = 50 // milliseconds
+
   const setupCollisionEvents = (world) => {
-    // Create event queue for collision detection
-    if (!eventQueue) {
-      eventQueue = new RAPIER.EventQueue(true)
-      console.log('Event queue created:', eventQueue)
-    }
+    //console.log('Setting up collision events...')
+    eventQueue = new RAPIER.EventQueue(true)
   }
-  
+
   const handleCollisions = (world) => {
-    if (!eventQueue) return
+    if (!eventQueue || !world) return
     
-    // Process all collision events
+    world.forEachCollider(collider => {
+      if (!collider.parent()) return
+      collider.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS)
+    })
+    
+    const currentTime = performance.now()
+    
     eventQueue.drainCollisionEvents((handle1, handle2, started) => {
-      if (!started) return // Skip collision end events
+      if (!started) return // Silently skip end events
       
-      // Get the actual colliders from the handles
       const collider1 = world.getCollider(handle1)
       const collider2 = world.getCollider(handle2)
       
       if (!collider1 || !collider2) return
       
-      // Get the parent rigid bodies of the colliders
       const body1 = collider1.parent()
       const body2 = collider2.parent()
       
       if (!body1 || !body2) return
       
-      // Calculate collision velocity
       const vel1 = body1.linvel()
       const vel2 = body2.linvel()
       
@@ -52,23 +54,28 @@ export const usePhysicsSystem = () => {
       )
       
       const speed = relativeVelocity.length()
+      const isBowlCollision = body1.isFixed() || body2.isFixed()
       
-      // Check if either body is the bowl (using custom user data)
-      const isBowlCollision = 
-        (body1.userData?.type === 'bowl') || 
-        (body2.userData?.type === 'bowl')
-      
-      console.log('Collision detected:', {
-        speed,
-        isBowlCollision,
-        body1Type: body1.userData?.type,
-        body2Type: body2.userData?.type
-      })
-      
-      // Only play sound if speed is above threshold
-      if (speed > 0.1) {
-        audioSystem.playCollisionSound(speed, isBowlCollision)
+      // Skip if too soon after last collision
+      if (currentTime - lastCollisionTime < COLLISION_COOLDOWN) {
+        //console.log('Skipping collision (cooldown)')
+        return
       }
+      
+      if (speed < 0.1) {
+        //console.log('Speed too low for sound:', speed)
+        return
+      }
+
+      // Scale the speed to a reasonable volume range (0.1 to 1.0)
+      const volume = Math.min(Math.max(speed / 20, 0.1), 1.0)
+      
+      // Update last collision time
+      lastCollisionTime = currentTime
+      
+      // Resume audio context and play sound
+      audioSystem.resumeAudioContext()
+      audioSystem.playCollisionSound(volume, isBowlCollision)
     })
   }
 
@@ -80,16 +87,12 @@ export const usePhysicsSystem = () => {
     
     let stepCount = 0
     while (accumulator.value >= timeStep) {
-      // Handle any pending collisions
-      handleCollisions(world)
-      
-      // Step the physics world with the event queue
       world.step(eventQueue)
+      handleCollisions(world)
       
       accumulator.value -= timeStep
       stepCount++
       
-      // Prevent too many steps in case of large deltaTime
       if (stepCount >= 3) break
     }
     
@@ -112,7 +115,6 @@ export const usePhysicsSystem = () => {
     return settled
   }
 
-  // Rest of the methods remain the same...
   const storePhysicsState = (rigidBodies) => {
     rigidBodies.forEach((rb, index) => {
       if (rb) {

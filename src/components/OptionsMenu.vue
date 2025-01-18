@@ -4,12 +4,14 @@ import { usePhysicsStore } from '../stores/physicsStore'
 import { useBackgroundStore } from '../stores/backgroundStore'
 import { useDiceAppearanceStore } from '../stores/diceAppearanceStore'
 import { CHECK_TYPES } from '../constants/diceTypes'
+import { useAudioSystem } from '../composables/useAudioSystem'
 
 const physicsStore = usePhysicsStore()
 const backgroundStore = useBackgroundStore()
 const diceAppearanceStore = useDiceAppearanceStore()
 const isMenuOpen = ref(false)
 const menuRef = ref(null)
+const audioSystem = useAudioSystem()
 
 const speedOptions = [
   { value: 1, label: '1x' },
@@ -78,8 +80,8 @@ onUnmounted(() => {
     </button>
 
     <Transition enter-active-class="animate-in" enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100" leave-active-class="animate-out"
-      leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
+      enter-to-class="opacity-100 scale-100" leave-active-class="animate-out" leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95">
       <div v-if="isMenuOpen" class="menu-panel">
         <!-- Animation Speed Section (not collapsible) -->
         <div class="menu-section">
@@ -90,6 +92,13 @@ onUnmounted(() => {
               {{ option.label }}
             </button>
           </div>
+        </div>
+
+        <div class="menu-section">
+          <h3>Audio</h3>
+          <button class="mute-toggle" :class="{ active: audioSystem.isMuted.value }" @click="audioSystem.toggleMute">
+            {{ audioSystem.isMuted.value ? 'Stumm' : 'Stumm' }}
+          </button>
         </div>
 
         <!-- Dice Colors Section -->
@@ -124,15 +133,12 @@ onUnmounted(() => {
 
                 <!-- Talent Colors Toggle -->
                 <div class="talent-color-toggle">
-  <label>Talentproben-Farben:</label>
-  <button 
-    class="toggle-button" 
-    :class="{ active: !diceAppearanceStore.preferences.useTalentColors }"
-    @click="diceAppearanceStore.toggleTalentColors"
-  >
-    {{ diceAppearanceStore.preferences.useTalentColors ? 'Einheitliche Farbe' : 'Attributfarben' }}
-  </button>
-</div>
+                  <label>Talentproben-Farben:</label>
+                  <button class="toggle-button" :class="{ active: !diceAppearanceStore.preferences.useTalentColors }"
+                    @click="diceAppearanceStore.toggleTalentColors">
+                    {{ diceAppearanceStore.preferences.useTalentColors ? 'Einheitliche Farbe' : 'Attributfarben' }}
+                  </button>
+                </div>
 
                 <!-- D6 Colors -->
                 <h4>D6 Würfel</h4>
@@ -503,13 +509,18 @@ onUnmounted(() => {
   border-radius: 4px;
   padding: 1rem;
   min-width: 200px;
-  max-height: 80vh; /* Limit height to 80% of viewport height */
-  overflow-y: auto; /* Enable vertical scrolling */
-  overflow-x: hidden; /* Prevent horizontal scrolling */
+  max-height: 80vh;
+  /* Limit height to 80% of viewport height */
+  overflow-y: auto;
+  /* Enable vertical scrolling */
+  overflow-x: hidden;
+  /* Prevent horizontal scrolling */
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   transform-origin: top right;
-  scrollbar-width: thin; /* Firefox */
-  scrollbar-color: #444 #222; /* Firefox */
+  scrollbar-width: thin;
+  /* Firefox */
+  scrollbar-color: #444 #222;
+  /* Firefox */
 }
 
 /* Webkit (Chrome, Safari, Edge) scrollbar styling */
@@ -543,5 +554,25 @@ onUnmounted(() => {
   .menu-panel {
     max-height: 60vh;
   }
+}
+
+.mute-toggle {
+  width: 100%;
+  padding: 0.5rem;
+  background: #333;
+  border: 1px solid #444;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mute-toggle:hover {
+  background: #444;
+}
+
+.mute-toggle.active {
+  background: #42b983;
+  border-color: #42b983;
 }
 </style>
