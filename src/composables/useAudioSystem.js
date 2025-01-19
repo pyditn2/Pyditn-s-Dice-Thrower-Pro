@@ -2,7 +2,7 @@ import { ref } from 'vue'
 
 const SOUND_CONFIG = {
   DICE_COLLISION: {
-    path: '/public/sounds/dice-collision.mp3',
+    path: 'sounds/dice-collision.mp3',
     options: {
       baseVolume: 0.7,
       velocityScale: 40,
@@ -14,7 +14,7 @@ const SOUND_CONFIG = {
     }
   },
   BOWL_COLLISION: {
-    path: '/public/sounds/dice-bowl.mp3',
+    path: 'sounds/dice-bowl.mp3',
     options: {
       baseVolume: 0.8,
       velocityScale: 35,
