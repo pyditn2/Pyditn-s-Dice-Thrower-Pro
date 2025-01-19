@@ -16,10 +16,15 @@ export const usePhysicsSystem = () => {
   let lastCollisionTime = 0
   const COLLISION_COOLDOWN = 100 // milliseconds
 
+  const tempVec1 = new THREE.Vector3()
+  const tempVec2 = new THREE.Vector3()
+  const tempQuat1 = new THREE.Quaternion()
+  const tempQuat2 = new THREE.Quaternion()
+
   const setupCollisionEvents = (world) => {
     console.log('Setting up collision events...')
     eventQueue = new RAPIER.EventQueue(true)
-    // Call setup immediately
+    
     setupPhysicsAndAudio()
   }
 
@@ -79,11 +84,8 @@ export const usePhysicsSystem = () => {
         return
       }
   
-      // Log the speed for debugging
-      console.log(`Collision speed: ${speed.toFixed(3)} (${isBowlCollision ? 'bowl' : 'dice'})`);
-  
-      // Apply a more aggressive scaling to the raw speed
-      const scaledSpeed = Math.pow(speed, 1.5) / 2  // This will make quiet collisions much quieter
+      
+      const scaledSpeed = Math.pow(speed, 1.5) / 2  // Scaled speed for volume
   
       // Update last collision time
       lastCollisionTime = currentTime
@@ -129,48 +131,75 @@ export const usePhysicsSystem = () => {
   }
 
   const storePhysicsState = (rigidBodies) => {
+    if (!Array.isArray(rigidBodies)) return
+    
     rigidBodies.forEach((rb, index) => {
-      if (rb) {
+      if (!rb) return
+      
+      const translation = rb.translation()
+      const rotation = rb.rotation()
+      
+      // Only store if we have valid values
+      if (translation && rotation) {
         previousState.value.set(index, {
-          position: rb.translation(),
-          rotation: rb.rotation()
+          position: { x: translation.x, y: translation.y, z: translation.z },
+          rotation: { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w }
         })
       }
     })
   }
 
   const updateCurrentState = (rigidBodies) => {
+    if (!Array.isArray(rigidBodies)) return
+    
     rigidBodies.forEach((rb, index) => {
-      if (rb) {
+      if (!rb) return
+      
+      const translation = rb.translation()
+      const rotation = rb.rotation()
+      
+      // Only store if we have valid values
+      if (translation && rotation) {
         currentState.value.set(index, {
-          position: rb.translation(),
-          rotation: rb.rotation()
+          position: { x: translation.x, y: translation.y, z: translation.z },
+          rotation: { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w }
         })
       }
     })
   }
 
   const interpolateVisualState = (dice, alpha) => {
+    // Clamp alpha to prevent extrapolation
+    const clampedAlpha = Math.min(Math.max(alpha, 0), 1)
+    
     dice.forEach((die, index) => {
       const previous = previousState.value.get(index)
       const current = currentState.value.get(index)
       
-      if (previous && current && die) {
-        die.position.lerpVectors(
-          new THREE.Vector3(previous.position.x, previous.position.y, previous.position.z),
-          new THREE.Vector3(current.position.x, current.position.y, current.position.z),
-          alpha
-        )
-        
-        const prevQuat = new THREE.Quaternion(
-          previous.rotation.x, previous.rotation.y, 
-          previous.rotation.z, previous.rotation.w
-        )
-        const currQuat = new THREE.Quaternion(
-          current.rotation.x, current.rotation.y, 
-          current.rotation.z, current.rotation.w
-        )
-        die.quaternion.slerpQuaternions(prevQuat, currQuat, alpha)
+      if (!previous || !current || !die) return
+      
+      // Position interpolation using reusable vectors
+      tempVec1.set(previous.position.x, previous.position.y, previous.position.z)
+      tempVec2.set(current.position.x, current.position.y, current.position.z)
+      die.position.lerpVectors(tempVec1, tempVec2, clampedAlpha)
+      
+      // Rotation interpolation using reusable quaternions
+      tempQuat1.set(
+        previous.rotation.x,
+        previous.rotation.y,
+        previous.rotation.z,
+        previous.rotation.w
+      )
+      tempQuat2.set(
+        current.rotation.x,
+        current.rotation.y,
+        current.rotation.z,
+        current.rotation.w
+      )
+      
+      // Check for valid quaternions
+      if (tempQuat1.length() > 0.1 && tempQuat2.length() > 0.1) {
+        die.quaternion.slerpQuaternions(tempQuat1, tempQuat2, clampedAlpha)
       }
     })
   }

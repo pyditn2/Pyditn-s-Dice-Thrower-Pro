@@ -1,14 +1,12 @@
 import { ref } from 'vue'
 
-// Sound configuration
-// Sound configuration
 const SOUND_CONFIG = {
   DICE_COLLISION: {
     path: '/public/sounds/dice-collision.mp3',
     options: {
-      baseVolume: 0.7,      // Reduced base volume
-      velocityScale: 40,    // Increased scaling factor to make soft collisions quieter
-      minVolume: 0.05,      // Much lower minimum volume
+      baseVolume: 0.7,
+      velocityScale: 40,
+      minVolume: 0.05,
       maxVolume: 1.0,
       pitchVariation: 0.2,
       attack: 0.005,
@@ -18,9 +16,9 @@ const SOUND_CONFIG = {
   BOWL_COLLISION: {
     path: '/public/sounds/dice-bowl.mp3',
     options: {
-      baseVolume: 0.8,      // Bowl collisions can be slightly louder
-      velocityScale: 35,    // Different scaling for bowl
-      minVolume: 0.05,      // Same low minimum
+      baseVolume: 0.8,
+      velocityScale: 35,
+      minVolume: 0.05,
       maxVolume: 1.0,
       pitchVariation: 0.1,
       attack: 0.005,
