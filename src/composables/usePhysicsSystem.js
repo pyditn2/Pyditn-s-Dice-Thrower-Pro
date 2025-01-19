@@ -14,11 +14,24 @@ export const usePhysicsSystem = () => {
   const accumulator = ref(0)
   let eventQueue = null
   let lastCollisionTime = 0
-  const COLLISION_COOLDOWN = 50 // milliseconds
+  const COLLISION_COOLDOWN = 100 // milliseconds
 
   const setupCollisionEvents = (world) => {
-    //console.log('Setting up collision events...')
+    console.log('Setting up collision events...')
     eventQueue = new RAPIER.EventQueue(true)
+    // Call setup immediately
+    setupPhysicsAndAudio()
+  }
+
+  const setupPhysicsAndAudio = async () => {
+    console.log('Setting up physics and audio...')
+    try {
+      // Wait for audio initialization
+      await audioSystem.initPromise
+      console.log('Audio initialization complete')
+    } catch (error) {
+      console.error('Failed to initialize audio:', error)
+    }
   }
 
   const handleCollisions = (world) => {
@@ -32,7 +45,7 @@ export const usePhysicsSystem = () => {
     const currentTime = performance.now()
     
     eventQueue.drainCollisionEvents((handle1, handle2, started) => {
-      if (!started) return // Silently skip end events
+      if (!started) return
       
       const collider1 = world.getCollider(handle1)
       const collider2 = world.getCollider(handle2)
@@ -58,24 +71,24 @@ export const usePhysicsSystem = () => {
       
       // Skip if too soon after last collision
       if (currentTime - lastCollisionTime < COLLISION_COOLDOWN) {
-        //console.log('Skipping collision (cooldown)')
         return
       }
       
-      if (speed < 0.1) {
-        //console.log('Speed too low for sound:', speed)
+      // Adjusted minimum speed threshold
+      if (speed < 0.05) {
         return
       }
-
-      // Scale the speed to a reasonable volume range (0.1 to 1.0)
-      const volume = Math.min(Math.max(speed / 20, 0.1), 1.0)
-      
+  
+      // Log the speed for debugging
+      console.log(`Collision speed: ${speed.toFixed(3)} (${isBowlCollision ? 'bowl' : 'dice'})`);
+  
+      // Apply a more aggressive scaling to the raw speed
+      const scaledSpeed = Math.pow(speed, 1.5) / 2  // This will make quiet collisions much quieter
+  
       // Update last collision time
       lastCollisionTime = currentTime
       
-      // Resume audio context and play sound
-      audioSystem.resumeAudioContext()
-      audioSystem.playCollisionSound(volume, isBowlCollision)
+      audioSystem.playCollisionSound(scaledSpeed, isBowlCollision)
     })
   }
 
