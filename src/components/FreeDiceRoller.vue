@@ -1,21 +1,20 @@
 <script setup>
 import { ref, computed } from 'vue'
 import DiceRoller from './DiceRoller.vue'
+import SearchableDropdown from './SearchableDropdown.vue'
 import { useDiceAppearanceStore } from '../stores/diceAppearanceStore'
 
 const diceAppearanceStore = useDiceAppearanceStore()
 const diceRoller = ref(null)
 
-const DICE_TYPES = {
-  D20: { value: 'd20', label: 'W20' },
-  D6: { value: 'd6', label: 'W6' }
-}
+const DICE_TYPES = [
+  { value: 'd20', label: 'W20' },
+  { value: 'd6', label: 'W6' }
+]
 
-const selectedDiceType = ref(DICE_TYPES.D20.value)
+const selectedDiceType = ref(DICE_TYPES[0])
 const diceCount = ref(1)
 const result = ref(null)
-
-const diceOptions = Object.values(DICE_TYPES)
 
 const performRoll = async () => {
   try {
@@ -26,13 +25,13 @@ const performRoll = async () => {
     diceRoller.value.updateViewMode(diceCount.value > 1)
     
     // Get appropriate appearance based on dice type
-    const appearance = selectedDiceType.value === 'd20' 
-      ? diceAppearanceStore.getD20Appearance('attribute', 'MU')  // Using attribute appearance as fallback
-      : diceAppearanceStore.getD6Appearance('damage')  // Using damage appearance as fallback
+    const appearance = selectedDiceType.value.value === 'd20' 
+      ? diceAppearanceStore.getD20Appearance('attribute', 'MU')
+      : diceAppearanceStore.getD6Appearance('damage')
 
     // Roll the dice
     const rolls = await diceRoller.value.rollDice(
-      selectedDiceType.value,
+      selectedDiceType.value.value,
       diceCount.value,
       appearance
     )
@@ -53,7 +52,6 @@ const performRoll = async () => {
 const resetCamera = () => {
   diceRoller.value?.resetCamera()
 }
-
 </script>
 
 <template>
@@ -65,35 +63,32 @@ const resetCamera = () => {
     <!-- Dice labels -->
     <div class="dice-labels">
       <div class="dice-label" v-for="i in diceCount" :key="i">
-        {{ DICE_TYPES[selectedDiceType.toUpperCase()]?.label || selectedDiceType }}
+        {{ selectedDiceType?.label || 'W20' }}
       </div>
     </div>
 
     <!-- Controls -->
     <div class="controls">
-      <!-- Dice selection -->
-      <div class="dice-selection">
-        <div class="selection-row">
-          <select v-model="selectedDiceType" class="dice-type-select">
-            <option v-for="dice in diceOptions" :key="dice.value" :value="dice.value">
-              {{ dice.label }}
-            </option>
-          </select>
-        </div>
+      <div class="selection">
+        <SearchableDropdown 
+          v-model="selectedDiceType" 
+          :items="DICE_TYPES"
+          :display-field="item => item.label"
+          :value-field="item => item.label"
+          placeholder="Würfel auswählen..."
+        />
+      </div>
 
-        <div class="selection-row">
-          <div class="dice-count">
-            <label for="diceCount">Anzahl:</label>
-            <input 
-              id="diceCount" 
-              type="number" 
-              v-model.number="diceCount" 
-              min="1" 
-              max="6"
-              class="dice-count-input"
-            />
-          </div>
-        </div>
+      <div class="dice-count">
+        <label for="diceCount">Anzahl:</label>
+        <input 
+          id="diceCount" 
+          type="number" 
+          v-model.number="diceCount" 
+          min="1" 
+          max="6"
+          class="dice-count-input"
+        />
       </div>
 
       <div class="button-group">
@@ -139,60 +134,36 @@ const resetCamera = () => {
   width: 100%;
 }
 
-.dice-labels {
-  width: 100%;
-  text-align: center;
-  margin-bottom: 1rem;
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.dice-label {
-  text-align: center;
-  color: #42b983;
-  text-shadow: #42b983 0 0 4px;
-  font-weight: bold;
-  font-size: 0.9rem;
-  margin: 0.5rem auto;
-}
-
 .controls {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   width: 100%;
-  max-width: 400px;
-  align-items: center;
-  margin: 0 auto;
-}
-
-.controls {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: 100%;
-  max-width: 400px;
+  max-width: 330px;
   align-items: center;
   margin: 0 auto;
 }
 
 .selection {
   width: 100%;
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  align-items: center;
+  max-width: 300px;
 }
 
-.dice-type-select {
-  padding: 0.5rem;
-  background: #333;
+.button-group {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.roll-button {
+  flex: 2;
+  padding: 0.75rem;
+  background: #42b983;
   color: white;
-  border: 1px solid #444;
+  border: none;
   border-radius: 4px;
-  width: 120px;
+  cursor: pointer;
+  font-size: 1.1rem;
 }
 
 .dice-count {
@@ -211,22 +182,6 @@ const resetCamera = () => {
   text-align: center;
 }
 
-.button-group {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.roll-button {
-  padding: 0.75rem;
-  background: #42b983;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1.1rem;
-  width: 120px;
-}
-
 .camera-reset-button {
   background: #333;
   color: white;
@@ -236,12 +191,28 @@ const resetCamera = () => {
   cursor: pointer;
   font-size: 0.9rem;
   transition: background-color 0.2s;
-  width: auto;
-  min-width: fit-content;
 }
 
 .camera-reset-button:hover {
   background: #444;
+}
+
+.dice-labels {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.dice-label {
+  text-align: center;
+  color: #42b983;
+  text-shadow: #42b983 0 0 4px;
+  font-weight: bold;
+  font-size: 0.9rem;
 }
 
 .result {
@@ -250,7 +221,7 @@ const resetCamera = () => {
   border-radius: 4px;
   text-align: center;
   width: 100%;
-  max-width: 400px;
+  max-width: 300px;
   margin: 1rem auto;
 }
 
