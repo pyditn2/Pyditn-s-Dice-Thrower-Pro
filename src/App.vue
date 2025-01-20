@@ -3,7 +3,8 @@ import { ref } from 'vue'
 import { invoke } from "@tauri-apps/api/core"
 import DiceCheck from './components/DiceCheck.vue'
 import CharacterEditor from './components/CharacterEditor.vue'
-import CharacterSelector from "./components/CharacterSelector.vue";
+import CharacterSelector from "./components/CharacterSelector.vue"
+import FreeDiceRoller from './components/FreeDiceRoller.vue'
 import OptionsMenu from './components/OptionsMenu.vue'
 import ThreeBackground from './components/ThreeBackground.vue'
 
@@ -23,6 +24,13 @@ const activeTab = ref('dice')
         Würfelproben
       </button>
       <button 
+        :class="{ active: activeTab === 'free-dice' }"
+        class="tab-button"
+        @click="activeTab = 'free-dice'"
+      >
+        Freies Würfeln
+      </button>
+      <button 
         :class="{ active: activeTab === 'character' }"
         class="tab-button"
         @click="activeTab = 'character'"
@@ -33,8 +41,9 @@ const activeTab = ref('dice')
 
     <!-- Tab Content -->
     <div class="tab-content">
-      <CharacterSelector />
+      <CharacterSelector v-if="activeTab === 'dice'" />
       <DiceCheck v-if="activeTab === 'dice'" />
+      <FreeDiceRoller v-if="activeTab === 'free-dice'" />
       <CharacterEditor v-if="activeTab === 'character'" />
     </div>
   </div>
