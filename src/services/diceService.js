@@ -76,7 +76,7 @@ export class DiceService {
                 success: true,
                 pointsNeeded: 0,
                 remainingPoints: talent.value,
-                qualityLevel: this.calculateQS(talent.value),
+                qualityLevel: this.calculateQS(talent.value + 1),
                 critical: criticalResult,
                 modification
             }
