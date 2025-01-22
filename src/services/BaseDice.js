@@ -67,12 +67,12 @@ export class BaseDice {
       opacity: this.appearance.opacity,
       transparent: this.appearance.opacity < 1,
       shininess: this.appearance.shininess,
-      shadowSide: THREE.BackSide,
-      receiveShadow: true
+      shadowSide: THREE.BackSide
     })
     
     const mesh = new THREE.Mesh(geometry, material)
     mesh.castShadow = true
+    mesh.receiveShadow = true  // Moved from material to mesh property
     
     // Store the initial appearance for reference
     mesh.userData.appearance = { ...this.appearance }
@@ -136,18 +136,15 @@ export class BaseDice {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
     
+    // Create a wireframe geometry instead of using the wireframe property
+    const wireframeGeometry = new THREE.WireframeGeometry(geometry)
     const material = new THREE.LineBasicMaterial({
       color: 0x00ffff,
-      wireframe: true,
       transparent: true,
       opacity: 0.5
     })
 
-    const wireframe = new THREE.LineSegments(
-      new THREE.WireframeGeometry(geometry),
-      material
-    )
-    
+    const wireframe = new THREE.LineSegments(wireframeGeometry, material)
     wireframe.visible = false
     return wireframe
   }

@@ -16,19 +16,23 @@ export const useSceneSystem = () => {
     const mainLight = new THREE.DirectionalLight(0xffffff, 1)
     mainLight.position.set(5, 10, 5)
     mainLight.castShadow = true
-
-    mainLight.shadow.mapSize.width = 1024
-    mainLight.shadow.mapSize.height = 1024
-    mainLight.shadow.camera.near = 0.5
+  
+    // Increase shadow map size for better quality
+    mainLight.shadow.mapSize.width = 2048
+    mainLight.shadow.mapSize.height = 2048
+    
+    // Adjust camera bounds
+    mainLight.shadow.camera.near = 0.1  // Decreased from 0.5
     mainLight.shadow.camera.far = 50
     mainLight.shadow.camera.left = -10
     mainLight.shadow.camera.right = 10
     mainLight.shadow.camera.top = 10
     mainLight.shadow.camera.bottom = -10
     
-    mainLight.shadow.bias = -0.001    
-    mainLight.shadow.normalBias = 0.02   
-    mainLight.shadow.radius = 1.5      
+    // Fine-tune shadow parameters
+    mainLight.shadow.bias = -0.0001    // Reduced from -0.001
+    mainLight.shadow.normalBias = 0.0   // Reduced from 0.02
+    mainLight.shadow.radius = 1         // Slightly reduced from 1.5
     
     return mainLight
   }
