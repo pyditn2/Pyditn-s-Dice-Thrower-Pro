@@ -285,22 +285,44 @@ export const useSceneSystem = () => {
   }
 
   const cleanupScene = () => {
-    // Clear dice wireframes first
+    // Dispose of dice wireframes
     diceWireframes.value.forEach(wireframe => {
-      if (wireframe.parent) {
-        wireframe.parent.remove(wireframe)
-      }
-    })
-    diceWireframes.value = []
+      if (wireframe.geometry) wireframe.geometry.dispose();
+      if (wireframe.material) wireframe.material.dispose();
+      if (wireframe.parent) wireframe.parent.remove(wireframe);
+    });
+    diceWireframes.value = [];
   
+    // Properly dispose of all scene objects
+    scene.value.traverse((object) => {
+      if (object instanceof THREE.Mesh) {
+        if (object.geometry) {
+          object.geometry.dispose();
+        }
+        if (object.material) {
+          if (Array.isArray(object.material)) {
+            object.material.forEach(material => {
+              if (material.map) material.map.dispose();
+              material.dispose();
+            });
+          } else {
+            if (object.material.map) object.material.map.dispose();
+            object.material.dispose();
+          }
+        }
+      }
+    });
+  
+    // Clear scene
     while (scene.value.children.length > 0) {
-      scene.value.remove(scene.value.children[0])
+      scene.value.remove(scene.value.children[0]);
     }
   
-    scene.value.add(setupMainLight())
-    scene.value.add(new THREE.AmbientLight(0x404040))
-    createHexagonalGround()
-  }
+    // Recreate basic scene elements
+    scene.value.add(setupMainLight());
+    scene.value.add(new THREE.AmbientLight(0x404040));
+    createHexagonalGround();
+  };
   
   const toggleWireframes = (diceManagerInstance) => {
     showWireframes.value = !showWireframes.value
