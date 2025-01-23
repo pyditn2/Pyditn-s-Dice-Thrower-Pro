@@ -18,32 +18,69 @@ export class BaseDice {
   }
 
   createNumberTexture(number) {
+    // Create high-res canvas for better anti-aliasing
     const canvas = document.createElement('canvas')
-    const size = 128
+    const size = 512
     canvas.width = size
     canvas.height = size
     const ctx = canvas.getContext('2d')
     
+    // Enable image smoothing
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    
+    // Clear canvas
     ctx.clearRect(0, 0, size, size)
     
+    // Create background circle with soft edge
     ctx.beginPath()
     ctx.arc(size/2, size/2, size/3, 0, Math.PI * 2)
     ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
     ctx.fill()
-    
-    ctx.fillStyle = 'white'
-    ctx.font = 'bold 90px Arial'
+
+    // Set text properties with larger initial size
+    const fontSize = Math.floor(size * 0.7)
+    ctx.font = `bold ${fontSize}px Arial`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
+    
+    // Apply very slight blur for anti-aliasing
+    ctx.filter = 'blur(2px)'
+    
+    // Create engraved effect with adjusted offsets for higher resolution
+    // Shadow (creates depth illusion)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
+    ctx.fillText(number.toString(), size/2 + 16, size/2 + 16)
+    
+    // Dark base (simulates engraved area)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'
     ctx.fillText(number.toString(), size/2, size/2)
     
+    // Remove blur for sharper main number
+    ctx.filter = 'blur(1px)'
+    
+    // Highlight on top edge
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+    ctx.fillText(number.toString(), size/2 - 8, size/2 - 8)
+    
+    // Main number
+    ctx.fillStyle = 'rgba(220, 220, 220, 0.95)'
+    ctx.fillText(number.toString(), size/2 - 4, size/2 - 4)
+
     const texture = new THREE.CanvasTexture(canvas)
-    texture.center.set(0.5, 0.5)
+    
+    // Use anisotropic filtering if available
+    texture.anisotropy = 16
+    
+    // Use mipmapping
+    texture.minFilter = THREE.LinearMipmapLinearFilter
+    texture.magFilter = THREE.LinearFilter
     texture.needsUpdate = true
+    
     return texture
   }
 
-  createFaceLabel(number, center, normal) {
+createFaceLabel(number, center, normal) {
     const label = new THREE.Mesh(
       new THREE.PlaneGeometry(0.5, 0.5),
       new THREE.MeshPhongMaterial({
@@ -52,12 +89,17 @@ export class BaseDice {
         side: THREE.DoubleSide,
         shininess: 0,
         emissive: new THREE.Color(0x333333),
-        emissiveIntensity: 0.2
+        emissiveIntensity: 0.2,
+        alphaTest: 0.01  // Helps with edge quality
       })
     )
     
     label.castShadow = true
-    label.position.copy(center.clone().multiplyScalar(1.01))
+    
+    // Slight offset to prevent z-fighting
+    const offset = 0.001
+    label.position.copy(center.clone().multiplyScalar(1.01 + offset))
+    
     return label
   }
 
@@ -67,12 +109,12 @@ export class BaseDice {
       opacity: this.appearance.opacity,
       transparent: this.appearance.opacity < 1,
       shininess: this.appearance.shininess,
-      shadowSide: THREE.BackSide,
-      receiveShadow: true
+      shadowSide: THREE.BackSide
     })
     
     const mesh = new THREE.Mesh(geometry, material)
     mesh.castShadow = true
+    mesh.receiveShadow = true  // Moved from material to mesh property
     
     // Store the initial appearance for reference
     mesh.userData.appearance = { ...this.appearance }
@@ -136,18 +178,15 @@ export class BaseDice {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
     
+    // Create a wireframe geometry instead of using the wireframe property
+    const wireframeGeometry = new THREE.WireframeGeometry(geometry)
     const material = new THREE.LineBasicMaterial({
       color: 0x00ffff,
-      wireframe: true,
       transparent: true,
       opacity: 0.5
     })
 
-    const wireframe = new THREE.LineSegments(
-      new THREE.WireframeGeometry(geometry),
-      material
-    )
-    
+    const wireframe = new THREE.LineSegments(wireframeGeometry, material)
     wireframe.visible = false
     return wireframe
   }

@@ -22,6 +22,11 @@ const tempDamageBonus = ref(0)
 const criticalDamage = ref(null)
 const extraD6Result = ref(null)
 
+const isDualWielding = ref(false)
+const selectedSecondaryWeaponId = ref(null)
+const tempSecondaryATBonus = ref(0)
+const tempSecondaryDamageBonus = ref(0)
+
 const rollExtraD6 = async () => {
   diceRoller1.value.updateViewMode(false)
   const appearance = diceAppearanceStore.getD6Appearance('extra')
@@ -50,6 +55,13 @@ const selectedWeapon = computed({
   set: (newWeapon) => {
     selectedWeaponId.value = newWeapon?.id || null
     showDamageRoll.value = false
+  }
+})
+
+const selectedSecondaryWeapon = computed({
+  get: () => weapons.value.find(weapon => weapon.id === selectedSecondaryWeaponId.value) || null,
+  set: (newWeapon) => {
+    selectedSecondaryWeaponId.value = newWeapon?.id || null
   }
 })
 
@@ -120,23 +132,31 @@ const checkCriticalRolls = (rolls) => {
 }
 
 
-const rollDamage = async (weapon) => {
+const rollDamage = async (weapon, tempBonus = 0, hand = 'primary') => {
   const { diceCount, diceType, modifier } = weapon.tp
-  console.log("Starting damage roll for:", { diceCount, diceType, modifier });
-
+  
   diceRoller1.value.updateViewMode(true)
   const appearance = diceAppearanceStore.getD6Appearance('damage')
   const rolls = await diceRoller1.value.rollDice(`d${diceType}`, diceCount, appearance)
-  console.log("Damage roll results:", rolls);
-  const tempBonus = tempDamageBonus.value || 0
+  
   const damage = rolls.reduce((sum, roll) => sum + roll, 0) + modifier + tempBonus
 
-  result.value = {
-    ...result.value,
-    damageRolls: rolls,
-    totalDamage: damage,
-    damageModifier: modifier,
-    tempDamageBonus: tempBonus
+  if (result.value.isDualWielding) {
+    result.value[hand] = {
+      ...result.value[hand],
+      damageRolls: rolls,
+      totalDamage: damage,
+      damageModifier: modifier,
+      tempDamageBonus: tempBonus
+    }
+  } else {
+    result.value = {
+      ...result.value,
+      damageRolls: rolls,
+      totalDamage: damage,
+      damageModifier: modifier,
+      tempDamageBonus: tempBonus
+    }
   }
 }
 
@@ -188,73 +208,71 @@ const performCheck = async () => {
       console.log("Attribute check result set:", result.value);
 
     } else if (currentCheckType.value === CHECK_TYPES.TALENT) {
-  const talent = selectedTalent.value
-  if (!talent) return
+      const talent = selectedTalent.value
+      if (!talent) return
 
-  diceRoller1.value.updateViewMode(true)
-  
-  // Prepare appearances for all dice
-  const appearances = talent.attributes.map(attribute => 
-    diceAppearanceStore.getD20Appearance(
-      CHECK_TYPES.TALENT,
-      diceAppearanceStore.preferences.useTalentColors ? null : attribute
-    )
-  )
+      diceRoller1.value.updateViewMode(true)
+      
+      const appearances = talent.attributes.map(attribute => 
+        diceAppearanceStore.getD20Appearance(
+          CHECK_TYPES.TALENT,
+          diceAppearanceStore.preferences.useTalentColors ? null : attribute
+        )
+      )
 
-  // Roll all dice at once with their respective appearances
-  const rolls = await diceRoller1.value.rollDice('d20', 3, appearances)
-  console.log("Talent check roll results:", rolls)
+      const rolls = await diceRoller1.value.rollDice('d20', 3, appearances)
+      console.log("Talent check roll results:", rolls)
 
-  const criticalResult = checkCriticalRolls(rolls)
+      const criticalResult = checkCriticalRolls(rolls)
 
-  if (criticalResult) {
-    const pointsNeeded = criticalResult.success ? 0 : talent.value + 1
-    const remainingPoints = criticalResult.success ? talent.value : -1
-    const qualityLevel = criticalResult.success ? calculateQS(remainingPoints) : 0
+      if (criticalResult) {
+        const pointsNeeded = criticalResult.success ? 0 : talent.value + 1
+        const remainingPoints = criticalResult.success ? talent.value : -1
+        const qualityLevel = criticalResult.success ? calculateQS(remainingPoints) : 0
 
-    result.value = {
-      type: 'talent',
-      talent: talent.name,
-      rolls: rolls,
-      pointsNeeded,
-      remainingPoints,
-      success: criticalResult.success,
-      qualityLevel,
-      critical: criticalResult.message,
-      modifier: modifier.value
-    }
-    console.log("Talent check critical result set:", result.value)
-  } else {
-    let pointsNeeded = 0
-    const adjustedAttributes = talent.attributes.map(attr => ({
-      name: attr,
-      value: getAttributeValue(attr),
-      adjustedValue: getAttributeValue(attr) + modifier.value
-    }))
+        result.value = {
+          type: 'talent',
+          talent: talent.name,
+          rolls: rolls,
+          pointsNeeded,
+          remainingPoints,
+          success: criticalResult.success,
+          qualityLevel,
+          critical: criticalResult.message,
+          modifier: modifier.value
+        }
+        console.log("Talent check critical result set:", result.value)
+      } else {
+        let pointsNeeded = 0
+        const adjustedAttributes = talent.attributes.map(attr => ({
+          name: attr,
+          value: getAttributeValue(attr),
+          adjustedValue: getAttributeValue(attr) + modifier.value
+        }))
 
-    adjustedAttributes.forEach((attr, index) => {
-      if (rolls[index] > attr.adjustedValue) {
-        pointsNeeded += rolls[index] - attr.adjustedValue
+        adjustedAttributes.forEach((attr, index) => {
+          if (rolls[index] > attr.adjustedValue) {
+            pointsNeeded += rolls[index] - attr.adjustedValue
+          }
+        })
+
+        const remainingPoints = talent.value - pointsNeeded
+        const success = pointsNeeded <= talent.value
+        const qualityLevel = success ? calculateQS(remainingPoints) : 0
+
+        result.value = {
+          type: 'talent',
+          talent: talent.name,
+          rolls: rolls,
+          pointsNeeded,
+          remainingPoints,
+          success,
+          qualityLevel,
+          adjustedAttributes,
+          modifier: modifier.value
+        }
+        console.log("Talent check normal result set:", result.value)
       }
-    })
-
-    const remainingPoints = talent.value - pointsNeeded
-    const success = pointsNeeded <= talent.value
-    const qualityLevel = success ? calculateQS(remainingPoints) : 0
-
-    result.value = {
-      type: 'talent',
-      talent: talent.name,
-      rolls: rolls,
-      pointsNeeded,
-      remainingPoints,
-      success,
-      qualityLevel,
-      adjustedAttributes,
-      modifier: modifier.value
-    }
-    console.log("Talent check normal result set:", result.value)
-  }
 
     } else if (currentCheckType.value === CHECK_TYPES.COMBAT) {
       if (!selectedWeapon.value) {
@@ -262,38 +280,87 @@ const performCheck = async () => {
         return
       }
 
-      diceRoller1.value.updateViewMode(false)
-      const appearance = diceAppearanceStore.getD20Appearance(CHECK_TYPES.COMBAT)
-      const roll = await diceRoller1.value.rollDice('d20', 1, appearance)
-      const baseAttackValue = selectedWeapon.value.at + selectedWeapon.value.atBonus
-      const tempBonus = tempATBonus.value || 0
-      const attackValue = baseAttackValue + tempBonus
+      // Handle primary weapon
+      const primaryResult = await performWeaponCheck(
+        selectedWeapon.value,
+        tempATBonus.value || 0,
+        tempDamageBonus.value || 0,
+        'primary'
+      )
 
-      const success = roll[0] === 1 || (roll[0] <= attackValue && roll[0] !== 20)
-      const remainingPoints = success ? attackValue - roll[0] : 0
-      const qualityLevel = success ? calculateQS(remainingPoints) : 0
+      if (isDualWielding.value && selectedSecondaryWeapon.value) {
+        // Handle secondary weapon
+        const secondaryResult = await performWeaponCheck(
+          selectedSecondaryWeapon.value,
+          tempSecondaryATBonus.value || 0,
+          tempSecondaryDamageBonus.value || 0,
+          'secondary'
+        )
 
-      result.value = {
-        type: 'combat',
-        weapon: selectedWeapon.value.name,
-        rolls: [roll[0]],
-        baseTarget: baseAttackValue,
-        tempATBonus: tempBonus,
-        target: attackValue,
-        success,
-        remainingPoints,
-        qualityLevel,
-        critical: roll[0] === 1 ? 'Kritischer Treffer!' : (roll[0] === 20 ? 'Patzer!' : null)
+        // Combine results for dual wielding
+        result.value = {
+          type: 'combat',
+          isDualWielding: true,
+          primary: {
+            ...primaryResult,
+            showDamageRoll: primaryResult.success
+          },
+          secondary: {
+            ...secondaryResult,
+            showDamageRoll: secondaryResult.success
+          }
+        }
+      } else {
+        // Single weapon result
+        result.value = {
+          type: 'combat',
+          isDualWielding: false,
+          weapon: primaryResult.weapon,
+          rolls: primaryResult.rolls,
+          baseTarget: primaryResult.baseTarget,
+          tempATBonus: primaryResult.tempATBonus,
+          target: primaryResult.target,
+          success: primaryResult.success,
+          remainingPoints: primaryResult.remainingPoints,
+          qualityLevel: primaryResult.qualityLevel,
+          critical: primaryResult.critical,
+          showDamageRoll: primaryResult.success
+        }
       }
 
-      if (success) {
-        showDamageRoll.value = true
+      // Set showDamageRoll based on success
+      if (!result.value.isDualWielding) {
+        showDamageRoll.value = result.value.success
       }
-
-
     }
   } catch (error) {
     console.error('Error during check:', error)
+  }
+}
+
+const performWeaponCheck = async (weapon, tempATBonus, tempDamageBonus, hand) => {
+  const appearance = diceAppearanceStore.getD20Appearance(CHECK_TYPES.COMBAT)
+  const roll = await diceRoller1.value.rollDice('d20', 1, appearance)
+  
+  const baseAttackValue = weapon.at + weapon.atBonus
+  const attackValue = baseAttackValue + tempATBonus
+
+  const success = roll[0] === 1 || (roll[0] <= attackValue && roll[0] !== 20)
+  const remainingPoints = success ? attackValue - roll[0] : 0
+  const qualityLevel = success ? calculateQS(remainingPoints) : 0
+
+  return {
+    weapon: weapon.name,
+    hand,
+    rolls: [roll[0]],
+    baseTarget: baseAttackValue,
+    tempATBonus,
+    tempDamageBonus,
+    target: attackValue,
+    success,
+    remainingPoints,
+    qualityLevel,
+    critical: roll[0] === 1 ? 'Kritischer Treffer!' : (roll[0] === 20 ? 'Patzer!' : null)
   }
 }
 
@@ -364,40 +431,86 @@ watch(currentCheckType, (newType) => {
           </button>
         </div>
 
+        <!-- Attribute Selection -->
         <div class="selection" v-if="currentCheckType === CHECK_TYPES.ATTRIBUTE">
           <SearchableDropdown v-model="selectedAttributeObject" :items="attributes" :display-field="(item) => item.name"
             :value-field="(item) => item.value" placeholder="Attribut aussuchen..." />
         </div>
 
+        <!-- Talent Selection -->
         <div v-if="currentCheckType === CHECK_TYPES.TALENT" class="talent-selection">
           <SearchableDropdown v-model="selectedTalent" :items="talents" :display-field="(item) => item.name"
             :value-field="(item) => item.value" placeholder="Talent aussuchen..." />
         </div>
 
+        <!-- Combat Selection -->
         <div v-if="currentCheckType === CHECK_TYPES.COMBAT" class="weapon-selection">
-          <SearchableDropdown v-model="selectedWeapon" :items="weapons" :display-field="(item) => item.name"
-            :value-field="(item) => item.id" placeholder="Waffe aussuchen..." />
+          <!-- Primary weapon -->
+          <div class="weapon-primary">
+            <SearchableDropdown 
+              v-model="selectedWeapon" 
+              :items="weapons" 
+              :display-field="(item) => item.name"
+              :value-field="(item) => item.id" 
+              placeholder="Hauptwaffe aussuchen..." 
+            />
 
-          <div v-if="selectedWeapon" class="weapon-info">
-            <div>AT: {{ selectedWeapon.at + selectedWeapon.atBonus }}</div>
-            <div>Schaden: {{ selectedWeapon.tp.diceCount }}W{{ selectedWeapon.tp.diceType }}+{{
-              selectedWeapon.tp.modifier }}
+            <div v-if="selectedWeapon" class="weapon-info">
+              <div>AT: {{ selectedWeapon.at + selectedWeapon.atBonus }}</div>
+              <div>Schaden: {{ selectedWeapon.tp.diceCount }}W{{ selectedWeapon.tp.diceType }}+{{ selectedWeapon.tp.modifier }}</div>
+            </div>
+
+            <!-- Primary weapon bonuses -->
+            <div class="temp-bonuses">
+              <div class="bonus-input">
+                <label for="tempAT">Temp. AT Bonus:</label>
+                <input id="tempAT" type="number" v-model.number="tempATBonus" class="bonus-number" />
+              </div>
+              <div class="bonus-input">
+                <label for="tempDamage">Temp. TP Bonus:</label>
+                <input id="tempDamage" type="number" v-model.number="tempDamageBonus" class="bonus-number" />
+              </div>
             </div>
           </div>
 
-          <!-- Temporary bonus section -->
-          <div class="temp-bonuses">
-            <div class="bonus-input">
-              <label for="tempAT">Temp. AT Bonus:</label>
-              <input id="tempAT" type="number" v-model.number="tempATBonus" class="bonus-number" />
+          <!-- Dual wielding checkbox -->
+          <div class="dual-wield-toggle">
+            <label>
+              <input type="checkbox" v-model="isDualWielding" />
+              Beidhändig
+            </label>
+          </div>
+
+          <!-- Secondary weapon (shown when dual wielding) -->
+          <div v-if="isDualWielding" class="weapon-secondary">
+            <SearchableDropdown 
+              v-model="selectedSecondaryWeapon" 
+              :items="weapons" 
+              :display-field="(item) => item.name"
+              :value-field="(item) => item.id" 
+              placeholder="Nebenwaffe aussuchen..." 
+            />
+
+            <div v-if="selectedSecondaryWeapon" class="weapon-info">
+              <div>AT: {{ selectedSecondaryWeapon.at + selectedSecondaryWeapon.atBonus }}</div>
+              <div>Schaden: {{ selectedSecondaryWeapon.tp.diceCount }}W{{ selectedSecondaryWeapon.tp.diceType }}+{{ selectedSecondaryWeapon.tp.modifier }}</div>
             </div>
-            <div class="bonus-input">
-              <label for="tempDamage">Temp. TP Bonus:</label>
-              <input id="tempDamage" type="number" v-model.number="tempDamageBonus" class="bonus-number" />
+
+            <!-- Secondary weapon bonuses -->
+            <div class="temp-bonuses">
+              <div class="bonus-input">
+                <label for="tempSecondaryAT">Temp. AT Bonus:</label>
+                <input id="tempSecondaryAT" type="number" v-model.number="tempSecondaryATBonus" class="bonus-number" />
+              </div>
+              <div class="bonus-input">
+                <label for="tempSecondaryDamage">Temp. TP Bonus:</label>
+                <input id="tempSecondaryDamage" type="number" v-model.number="tempSecondaryDamageBonus" class="bonus-number" />
+              </div>
             </div>
           </div>
         </div>
 
+        <!-- Modifier (for non-combat checks) -->
         <div class="modifier" v-if="currentCheckType !== CHECK_TYPES.COMBAT">
           <label for="modifier">Erleichterung/Erschwernis:</label>
           <input id="modifier" type="number" v-model.number="modifier" />
@@ -420,23 +533,31 @@ watch(currentCheckType, (newType) => {
 
       <!-- Result display -->
       <div v-if="result" class="result" :class="{
-        success: result.success,
+        success: result.isDualWielding ? 
+          (result.primary?.success || result.secondary?.success) : 
+          result.success,
         critical: result.critical && result.success,
         fumble: result.critical && !result.success
       }">
-        <div class="success-indicator">
-          {{ result.critical || (result.success ? 'Erfolg!' : 'Misserfolg!') }}
-        </div>
-        <div v-if="result.success && result.type !== 'combat'" class="result-qs">QS {{ result.qualityLevel }}</div>
-        <div class="result-line">Würfe: {{ result.rolls.join(', ') }}</div>
-
+        <!-- Attribute check result -->
         <template v-if="result.type === 'attribute'">
+          <div class="success-indicator">
+            {{ result.critical || (result.success ? 'Erfolg!' : 'Misserfolg!') }}
+          </div>
+          <div v-if="result.success" class="result-qs">QS {{ result.qualityLevel }}</div>
+          <div class="result-line">Würfe: {{ result.rolls.join(', ') }}</div>
           <div class="result-line">Zielwert: {{ result.target }} (Angepasst: {{ result.adjustedTarget }})</div>
           <div v-if="result.success" class="result-line">Übrige Punkte: {{ result.remainingPoints }}</div>
           <div class="result-line">Modifikator: {{ result.modifier }}</div>
         </template>
 
-        <template v-else-if="result.type === 'talent'">
+        <!-- Talent check result -->
+        <template v-if="result.type === 'talent'">
+          <div class="success-indicator">
+            {{ result.critical || (result.success ? 'Erfolg!' : 'Misserfolg!') }}
+          </div>
+          <div v-if="result.success" class="result-qs">QS {{ result.qualityLevel }}</div>
+          <div class="result-line">Würfe: {{ result.rolls.join(', ') }}</div>
           <div class="result-line">Benötigte Punkte: {{ result.pointsNeeded }}</div>
           <div v-if="result.success" class="result-line">Übrige Punkte: {{ result.remainingPoints }}</div>
           <div class="result-line" v-for="attr in result.adjustedAttributes" :key="attr.name">
@@ -445,23 +566,121 @@ watch(currentCheckType, (newType) => {
           <div class="result-line">Modifikator: {{ result.modifier }}</div>
         </template>
 
-        <template v-else-if="result.type === 'combat'">
-          <div class="result-line">
-            <div>Waffe: {{ result.weapon }}</div>
-            <div>Angriffswert: {{ result.baseTarget }}
+        <!-- Combat check result -->
+        <template v-if="result.type === 'combat'">
+          <!-- Dual wielding results -->
+          <template v-if="result.isDualWielding">
+            <!-- Primary weapon result -->
+            <div class="weapon-result primary">
+              <h3>Hauptwaffe: {{ result.primary.weapon }}</h3>
+              <div class="success-indicator">
+                {{ result.primary.critical || (result.primary.success ? 'Erfolg!' : 'Misserfolg!') }}
+              </div>
+              <div class="result-line">Wurf: {{ result.primary.rolls.join(', ') }}</div>
+              <div class="result-line">
+                Angriffswert: {{ result.primary.baseTarget }}
+                {{ result.primary.tempATBonus ? ` + ${result.primary.tempATBonus}` : '' }}
+                = {{ result.primary.target }}
+              </div>
+              
+              <template v-if="result.primary.success">
+                <!-- Primary weapon damage roll section -->
+                <div v-if="!result.primary.damageRolls" class="damage-roll-section">
+                  <button class="damage-roll-button" @click="rollDamage(selectedWeapon, tempDamageBonus, 'primary')">
+                    Schaden würfeln
+                  </button>
+                </div>
+                <div v-else class="damage-result">
+                  <div>Schaden: {{ result.primary.totalDamage }}</div>
+                  <div class="damage-rolls">
+                    ({{ result.primary.damageRolls.join(' + ') }})
+                    {{ result.primary.damageModifier ? ' + ' + result.primary.damageModifier : '' }}
+                    {{ result.primary.tempDamageBonus ? ' + ' + result.primary.tempDamageBonus : '' }}
+                  </div>
+                </div>
+
+                <!-- Critical damage for primary weapon -->
+                <template v-if="result.primary.critical && result.primary.critical.includes('Kritischer')">
+                  <div class="critical-damage-section">
+                    <div v-if="!criticalDamage">
+                      <button class="critical-roll-button" @click="rollCriticalDamage">
+                        Kritischen Schaden würfeln
+                      </button>
+                    </div>
+                    <div v-else class="critical-damage-result">
+                      Kritischer Schaden: {{ criticalDamage }}
+                    </div>
+                  </div>
+                </template>
+              </template>
+            </div>
+
+            <!-- Secondary weapon result -->
+            <div class="weapon-result secondary">
+              <h3>Nebenwaffe: {{ result.secondary.weapon }}</h3>
+              <div class="success-indicator">
+                {{ result.secondary.critical || (result.secondary.success ? 'Erfolg!' : 'Misserfolg!') }}
+              </div>
+              <div class="result-line">Wurf: {{ result.secondary.rolls.join(', ') }}</div>
+              <div class="result-line">
+                Angriffswert: {{ result.secondary.baseTarget }}
+                {{ result.secondary.tempATBonus ? ` + ${result.secondary.tempATBonus}` : '' }}
+                = {{ result.secondary.target }}
+              </div>
+              
+              <template v-if="result.secondary.success">
+                <!-- Secondary weapon damage roll section -->
+                <div v-if="!result.secondary.damageRolls" class="damage-roll-section">
+                  <button class="damage-roll-button" @click="rollDamage(selectedSecondaryWeapon, tempSecondaryDamageBonus, 'secondary')">
+                    Schaden würfeln
+                  </button>
+                </div>
+                <div v-else class="damage-result">
+                  <div>Schaden: {{ result.secondary.totalDamage }}</div>
+                  <div class="damage-rolls">
+                    ({{ result.secondary.damageRolls.join(' + ') }})
+                    {{ result.secondary.damageModifier ? ' + ' + result.secondary.damageModifier : '' }}
+                    {{ result.secondary.tempDamageBonus ? ' + ' + result.secondary.tempDamageBonus : '' }}
+                  </div>
+                </div>
+
+                <!-- Critical damage for secondary weapon -->
+                <template v-if="result.secondary.critical && result.secondary.critical.includes('Kritischer')">
+                  <div class="critical-damage-section">
+                    <div v-if="!criticalDamage">
+                      <button class="critical-roll-button" @click="rollCriticalDamage">
+                        Kritischen Schaden würfeln
+                      </button>
+                    </div>
+                    <div v-else class="critical-damage-result">
+                      Kritischer Schaden: {{ criticalDamage }}
+                    </div>
+                  </div>
+                </template>
+              </template>
+            </div>
+          </template>
+
+          <!-- Single weapon result -->
+          <template v-else>
+            <div class="success-indicator">
+              {{ result.critical || (result.success ? 'Erfolg!' : 'Misserfolg!') }}
+            </div>
+            <div class="result-line">Wurf: {{ result.rolls.join(', ') }}</div>
+            <div class="result-line">
+              Angriffswert: {{ result.baseTarget }}
               {{ result.tempATBonus ? ` + ${result.tempATBonus}` : '' }}
               = {{ result.target }}
             </div>
 
             <template v-if="result.success">
-              <!-- Show damage roll button if attack was successful and damage hasn't been rolled yet -->
-              <div v-if="!result.damageRolls" class="damage-roll-section">
+              <!-- Damage roll section -->
+              <div v-if="!result.damageRolls && showDamageRoll" class="damage-roll-section">
                 <button class="damage-roll-button" @click="rollDamage(selectedWeapon)">
                   Schaden würfeln
                 </button>
               </div>
-              <!-- Show damage results only after they've been rolled -->
-              <div v-else class="damage-result">
+              <div v-else-if="result.damageRolls" class="damage-result">
                 <div>Schaden: {{ result.totalDamage }}</div>
                 <div class="damage-rolls">
                   ({{ result.damageRolls.join(' + ') }})
@@ -469,31 +688,34 @@ watch(currentCheckType, (newType) => {
                   {{ result.tempDamageBonus ? ' + ' + result.tempDamageBonus : '' }}
                 </div>
               </div>
+
+              <!-- Critical damage section -->
+              <template v-if="result.critical && result.critical.includes('Kritischer')">
+                <div class="critical-damage-section">
+                  <div v-if="!criticalDamage">
+                    <button class="critical-roll-button" @click="rollCriticalDamage">
+                      Kritischen Schaden würfeln
+                    </button>
+                  </div>
+                  <div v-else class="critical-damage-result">
+                    Kritischer Schaden: {{ criticalDamage }}
+                  </div>
+                </div>
+              </template>
             </template>
 
-            <!-- Critical damage section -->
-            <template v-if="result.critical && result.critical.includes('Kritischer')">
-              <div class="critical-damage-section">
-                <div v-if="!criticalDamage">
-                  <button class="critical-roll-button" @click="rollCriticalDamage">
-                    Kritischen Schaden würfeln
-                  </button>
-                </div>
-                <div v-else class="critical-damage-result">
-                  Kritischer Schaden: {{ criticalDamage }}
-                </div>
-              </div>
-            </template>
-          </div>
+            <!-- Display temp bonuses if they were used -->
+            <div class="result-line">
+              <div v-if="result.tempATBonus">Temporärer AT Bonus: {{ result.tempATBonus }}</div>
+              <div v-if="result.tempDamageBonus">Temporärer Schaden Bonus: {{ result.tempDamageBonus }}</div>
+            </div>
+          </template>
 
-          <!-- Remove or modify this section -->
-          <div class="result-line">
-            <div v-if="result.tempATBonus">Temporärer AT Bonus: {{ result.tempATBonus }}</div>
-            <div v-if="result.tempDamageBonus">Temporärer Schaden Bonus: {{ result.tempDamageBonus }}</div>
+          <!-- Extra D6 result (shown for both single and dual wielding) -->
+          <div v-if="extraD6Result" class="extra-d6-result">
+            W6 Ergebnis: {{ extraD6Result }}
           </div>
         </template>
-
-
       </div>
     </div>
     <div v-else class="no-character-selected">
@@ -633,7 +855,60 @@ watch(currentCheckType, (newType) => {
 .selection,
 .talent-selection,
 .weapon-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
   width: 100%;
+}
+
+.weapon-primary,
+.weapon-secondary {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.dual-wield-toggle {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+.dual-wield-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.dual-wield-toggle input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.weapon-result {
+  padding: 1rem;
+  margin: 0.5rem 0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.weapon-result h3 {
+  color: #42b983;
+  margin-bottom: 0.5rem;
+}
+
+.weapon-result.primary {
+  border-left: 3px solid #42b983;
+}
+
+.weapon-result.secondary {
+  border-left: 3px solid #b94242;
+}
+
+/* Adjust spacing between weapon results */
+.weapon-result + .weapon-result {
+  margin-top: 1rem;
 }
 
 .check-type button.active {

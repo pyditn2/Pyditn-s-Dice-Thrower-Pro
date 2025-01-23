@@ -24,9 +24,24 @@ export class D6Dice extends BaseDice {
   }
 
   createFaceLabel(number, center, normal) {
-    const label = super.createFaceLabel(number, center, normal)
+    const label = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.6, 0.6),
+      new THREE.MeshPhongMaterial({
+        map: this.createNumberTexture(number),
+        transparent: true,
+        side: THREE.DoubleSide,
+        shininess: 0,
+        emissive: new THREE.Color(0x333333),
+        emissiveIntensity: 0.2
+      })
+    )
     
+    label.castShadow = false
     label.scale.set(1.2, 1.2, 1.2)
+    
+    // Position the label slightly above the face to prevent z-fighting
+    const offset = 0.01
+    label.position.copy(center.clone().add(normal.clone().multiplyScalar(offset)))
     
     const up = new THREE.Vector3(0, 1, 0)
     if (Math.abs(normal.y) > 0.9) {
@@ -94,8 +109,7 @@ export class D6Dice extends BaseDice {
     // Update labels if needed
     mesh.children.forEach(label => {
       if (label.isMesh && label.material) {
-        // You might want to update label appearance properties here
-        // For now, we'll keep labels with their default appearance
+      // Update the label material later
       }
     })
   }

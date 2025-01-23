@@ -28,16 +28,20 @@ jobs:
           PATCH=$((VERSION_PARTS[2] + 1))
           NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$PATCH"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          
-      - name: Update package.json version
+
+      - name: Update package.json and tauri.conf.json versions
         run: |
-          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+          NEW_VERSION="${{ steps.version.outputs.version }}"
+          # Update package.json
+          npm version $NEW_VERSION --no-git-tag-version
+          # Update tauri.conf.json
+          sed -i'.bak' "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" src-tauri/tauri.conf.json
 
       - name: Commit and push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add package.json
+          git add package.json src-tauri/tauri.conf.json
           git commit -m "Bump version to ${{ steps.version.outputs.version }}"
           git push
 

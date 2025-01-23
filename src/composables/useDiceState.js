@@ -20,33 +20,58 @@ export const useDiceState = () => {
   )
 
   const setupViews = (containerRefs) => {
-    // Store current containers
-    currentContainers.value = containerRefs
-
-    // Clear existing renderers
+    // Properly dispose of existing renderers
     renderers.value.forEach(renderer => {
-      if (renderer && renderer.domElement && renderer.domElement.parentNode) {
-        renderer.domElement.parentNode.removeChild(renderer.domElement)
+      if (renderer) {
+        if (renderer.domElement && renderer.domElement.parentNode) {
+          renderer.domElement.parentNode.removeChild(renderer.domElement);
+        }
+        renderer.dispose();  // Dispose of the renderer
+        if (renderer.forceContextLoss) {
+          renderer.forceContextLoss();
+        }
       }
-    })
-
-    // Create new renderers for each container
+    });
+  
+    // Create new renderers with context loss handling
     renderers.value = containerRefs.map(() => {
-      const renderer = new THREE.WebGLRenderer({ antialias: true })
-      renderer.setSize(300, 300)
-      renderer.shadowMap.enabled = true
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap
-      return markRaw(renderer)
-    })
-
+      const renderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        powerPreference: 'high-performance',
+        failIfMajorPerformanceCaveat: true
+      });
+      
+      renderer.setSize(300, 300);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  
+      // Add context loss handling
+      renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
+      renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored, false);
+  
+      return markRaw(renderer);
+    });
+  
     // Attach renderers to containers
     renderers.value.forEach((renderer, index) => {
-      const container = containerRefs[index]
+      const container = containerRefs[index];
       if (container) {
-        container.innerHTML = ''
-        container.appendChild(renderer.domElement)
+        container.innerHTML = '';
+        container.appendChild(renderer.domElement);
       }
     })
+  }
+
+  const handleContextLost = (event) => {
+    event.preventDefault();
+    console.warn('WebGL context lost. Attempting to restore...');
+    
+  }
+
+  const handleContextRestored = () => {
+    console.log('WebGL context restored.');
+    
+    setupViews(currentContainers.value);
   }
 
   const updateViewMode = (showExtra) => {

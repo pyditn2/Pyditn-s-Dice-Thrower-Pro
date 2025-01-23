@@ -16,19 +16,23 @@ export const useSceneSystem = () => {
     const mainLight = new THREE.DirectionalLight(0xffffff, 1)
     mainLight.position.set(5, 10, 5)
     mainLight.castShadow = true
-
-    mainLight.shadow.mapSize.width = 1024
-    mainLight.shadow.mapSize.height = 1024
-    mainLight.shadow.camera.near = 0.5
+  
+    // Increase shadow map size for better quality
+    mainLight.shadow.mapSize.width = 2048
+    mainLight.shadow.mapSize.height = 2048
+    
+    // Adjust camera bounds
+    mainLight.shadow.camera.near = 0.1  // Decreased from 0.5
     mainLight.shadow.camera.far = 50
     mainLight.shadow.camera.left = -10
     mainLight.shadow.camera.right = 10
     mainLight.shadow.camera.top = 10
     mainLight.shadow.camera.bottom = -10
     
-    mainLight.shadow.bias = -0.001    
-    mainLight.shadow.normalBias = 0.02   
-    mainLight.shadow.radius = 1.5      
+    // Fine-tune shadow parameters
+    mainLight.shadow.bias = -0.0001    // Reduced from -0.001
+    mainLight.shadow.normalBias = 0.0   // Reduced from 0.02
+    mainLight.shadow.radius = 1         // Slightly reduced from 1.5
     
     return mainLight
   }
@@ -285,22 +289,44 @@ export const useSceneSystem = () => {
   }
 
   const cleanupScene = () => {
-    // Clear dice wireframes first
+    // Dispose of dice wireframes
     diceWireframes.value.forEach(wireframe => {
-      if (wireframe.parent) {
-        wireframe.parent.remove(wireframe)
-      }
-    })
-    diceWireframes.value = []
+      if (wireframe.geometry) wireframe.geometry.dispose();
+      if (wireframe.material) wireframe.material.dispose();
+      if (wireframe.parent) wireframe.parent.remove(wireframe);
+    });
+    diceWireframes.value = [];
   
+    // Properly dispose of all scene objects
+    scene.value.traverse((object) => {
+      if (object instanceof THREE.Mesh) {
+        if (object.geometry) {
+          object.geometry.dispose();
+        }
+        if (object.material) {
+          if (Array.isArray(object.material)) {
+            object.material.forEach(material => {
+              if (material.map) material.map.dispose();
+              material.dispose();
+            });
+          } else {
+            if (object.material.map) object.material.map.dispose();
+            object.material.dispose();
+          }
+        }
+      }
+    });
+  
+    // Clear scene
     while (scene.value.children.length > 0) {
-      scene.value.remove(scene.value.children[0])
+      scene.value.remove(scene.value.children[0]);
     }
   
-    scene.value.add(setupMainLight())
-    scene.value.add(new THREE.AmbientLight(0x404040))
-    createHexagonalGround()
-  }
+    // Recreate basic scene elements
+    scene.value.add(setupMainLight());
+    scene.value.add(new THREE.AmbientLight(0x404040));
+    createHexagonalGround();
+  };
   
   const toggleWireframes = (diceManagerInstance) => {
     showWireframes.value = !showWireframes.value

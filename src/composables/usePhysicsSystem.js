@@ -14,11 +14,29 @@ export const usePhysicsSystem = () => {
   const accumulator = ref(0)
   let eventQueue = null
   let lastCollisionTime = 0
-  const COLLISION_COOLDOWN = 50 // milliseconds
+  const COLLISION_COOLDOWN = 100 // milliseconds
+
+  const tempVec1 = new THREE.Vector3()
+  const tempVec2 = new THREE.Vector3()
+  const tempQuat1 = new THREE.Quaternion()
+  const tempQuat2 = new THREE.Quaternion()
 
   const setupCollisionEvents = (world) => {
-    //console.log('Setting up collision events...')
+    console.log('Setting up collision events...')
     eventQueue = new RAPIER.EventQueue(true)
+    
+    setupPhysicsAndAudio()
+  }
+
+  const setupPhysicsAndAudio = async () => {
+    console.log('Setting up physics and audio...')
+    try {
+      // Wait for audio initialization
+      await audioSystem.initPromise
+      console.log('Audio initialization complete')
+    } catch (error) {
+      console.error('Failed to initialize audio:', error)
+    }
   }
 
   const handleCollisions = (world) => {
@@ -32,7 +50,7 @@ export const usePhysicsSystem = () => {
     const currentTime = performance.now()
     
     eventQueue.drainCollisionEvents((handle1, handle2, started) => {
-      if (!started) return // Silently skip end events
+      if (!started) return
       
       const collider1 = world.getCollider(handle1)
       const collider2 = world.getCollider(handle2)
@@ -58,24 +76,21 @@ export const usePhysicsSystem = () => {
       
       // Skip if too soon after last collision
       if (currentTime - lastCollisionTime < COLLISION_COOLDOWN) {
-        //console.log('Skipping collision (cooldown)')
         return
       }
       
-      if (speed < 0.1) {
-        //console.log('Speed too low for sound:', speed)
+      // Adjusted minimum speed threshold
+      if (speed < 0.05) {
         return
       }
-
-      // Scale the speed to a reasonable volume range (0.1 to 1.0)
-      const volume = Math.min(Math.max(speed / 20, 0.1), 1.0)
+  
       
+      const scaledSpeed = Math.pow(speed, 1.5) / 2  // Scaled speed for volume
+  
       // Update last collision time
       lastCollisionTime = currentTime
       
-      // Resume audio context and play sound
-      audioSystem.resumeAudioContext()
-      audioSystem.playCollisionSound(volume, isBowlCollision)
+      audioSystem.playCollisionSound(scaledSpeed, isBowlCollision)
     })
   }
 
@@ -116,48 +131,75 @@ export const usePhysicsSystem = () => {
   }
 
   const storePhysicsState = (rigidBodies) => {
+    if (!Array.isArray(rigidBodies)) return
+    
     rigidBodies.forEach((rb, index) => {
-      if (rb) {
+      if (!rb) return
+      
+      const translation = rb.translation()
+      const rotation = rb.rotation()
+      
+      // Only store if we have valid values
+      if (translation && rotation) {
         previousState.value.set(index, {
-          position: rb.translation(),
-          rotation: rb.rotation()
+          position: { x: translation.x, y: translation.y, z: translation.z },
+          rotation: { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w }
         })
       }
     })
   }
 
   const updateCurrentState = (rigidBodies) => {
+    if (!Array.isArray(rigidBodies)) return
+    
     rigidBodies.forEach((rb, index) => {
-      if (rb) {
+      if (!rb) return
+      
+      const translation = rb.translation()
+      const rotation = rb.rotation()
+      
+      // Only store if we have valid values
+      if (translation && rotation) {
         currentState.value.set(index, {
-          position: rb.translation(),
-          rotation: rb.rotation()
+          position: { x: translation.x, y: translation.y, z: translation.z },
+          rotation: { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w }
         })
       }
     })
   }
 
   const interpolateVisualState = (dice, alpha) => {
+    // Clamp alpha to prevent extrapolation
+    const clampedAlpha = Math.min(Math.max(alpha, 0), 1)
+    
     dice.forEach((die, index) => {
       const previous = previousState.value.get(index)
       const current = currentState.value.get(index)
       
-      if (previous && current && die) {
-        die.position.lerpVectors(
-          new THREE.Vector3(previous.position.x, previous.position.y, previous.position.z),
-          new THREE.Vector3(current.position.x, current.position.y, current.position.z),
-          alpha
-        )
-        
-        const prevQuat = new THREE.Quaternion(
-          previous.rotation.x, previous.rotation.y, 
-          previous.rotation.z, previous.rotation.w
-        )
-        const currQuat = new THREE.Quaternion(
-          current.rotation.x, current.rotation.y, 
-          current.rotation.z, current.rotation.w
-        )
-        die.quaternion.slerpQuaternions(prevQuat, currQuat, alpha)
+      if (!previous || !current || !die) return
+      
+      // Position interpolation using reusable vectors
+      tempVec1.set(previous.position.x, previous.position.y, previous.position.z)
+      tempVec2.set(current.position.x, current.position.y, current.position.z)
+      die.position.lerpVectors(tempVec1, tempVec2, clampedAlpha)
+      
+      // Rotation interpolation using reusable quaternions
+      tempQuat1.set(
+        previous.rotation.x,
+        previous.rotation.y,
+        previous.rotation.z,
+        previous.rotation.w
+      )
+      tempQuat2.set(
+        current.rotation.x,
+        current.rotation.y,
+        current.rotation.z,
+        current.rotation.w
+      )
+      
+      // Check for valid quaternions
+      if (tempQuat1.length() > 0.1 && tempQuat2.length() > 0.1) {
+        die.quaternion.slerpQuaternions(tempQuat1, tempQuat2, clampedAlpha)
       }
     })
   }
