@@ -25,6 +25,8 @@ const isInitialized = ref(false)
 // Camera manager ref
 let cameraManager = null
 
+const activeContainers = ref(new Set())
+
 // Main animation loop
 const animate = (currentTime) => {
   if (physicsSystem.lastTime.value === 0) {
@@ -95,8 +97,9 @@ const animate = (currentTime) => {
 }
 
 const initializeContainer = (el, index) => {
-  if (el && !containerElements[index]) {
+  if (el) {
     containerElements[index] = el
+    activeContainers.value.add(index)
 
     // Check if all required containers are ready
     const allContainersReady = containerElements.length >= maxDiceCount.value &&
@@ -106,15 +109,34 @@ const initializeContainer = (el, index) => {
       diceState.setupViews(containerElements)
       isInitialized.value = true
     }
+  } else {
+    // Cleanup when container is unmounted
+    activeContainers.value.delete(index)
   }
 }
 
 const rollDice = async (type, count, appearance = null) => {
   try {
+    // Reset active containers for new roll
+    activeContainers.value.clear()
+    
     if (count > maxDiceCount.value) {
       maxDiceCount.value = count
       isInitialized.value = false
       await new Promise(resolve => setTimeout(resolve, 0))
+    } else if (count < maxDiceCount.value) {
+      // Cleanup unused containers when rolling fewer dice
+      for (let i = count; i < maxDiceCount.value; i++) {
+        if (containerElements[i]) {
+          const renderer = diceState.renderers.value[i]
+          if (renderer && renderer.domElement && renderer.domElement.parentNode) {
+            renderer.domElement.parentNode.removeChild(renderer.domElement)
+          }
+          containerElements[i] = null
+          diceState.renderers.value[i] = null
+        }
+      }
+      maxDiceCount.value = count
     }
 
     animationSystem.isRotating.value = false
@@ -231,10 +253,19 @@ defineExpose({
 </script>
 
 <template>
-  <div class="dice-views-container" :class="`dice-count-${maxDiceCount}`">
+  <div class="dice-views-container" :class="[
+    `dice-count-${maxDiceCount}`,
+    { 'single-die': maxDiceCount === 1 }
+  ]">
     <div class="dice-views">
-      <div v-for="n in maxDiceCount" :key="n" :ref="el => initializeContainer(el, n - 1)" class="dice-container"
-        v-show="n === 1 || (diceState.showExtraViews && n <= diceState.dice.value.length)"></div>
+      <div 
+        v-for="n in maxDiceCount" 
+        :key="n" 
+        :ref="el => initializeContainer(el, n - 1)" 
+        class="dice-container"
+        :class="{ 'active': activeContainers.has(n - 1) }"
+        v-show="n === 1 || (diceState.showExtraViews && n <= diceState.dice.value.length)"
+      ></div>
     </div>
   </div>
 </template>
@@ -245,7 +276,6 @@ defineExpose({
   position: relative;
   z-index: 1;
   max-width: 1200px;
-  /* Adjust based on your needs */
   margin: 0 auto;
 }
 
@@ -264,20 +294,29 @@ defineExpose({
   background-color: #1a1a1a;
   border-radius: 8px;
   overflow: hidden;
-  justify-self: center;
 }
 
-
-.dice-count-1 .dice-views {
-  grid-template-columns: 300px;
+/* Single die specific styling */
+.single-die .dice-views {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
 }
 
+.single-die .dice-container {
+  margin: 0 auto;
+}
+
+/* Multiple dice layouts */
 .dice-count-2 .dice-views {
   grid-template-columns: repeat(2, 300px);
+  justify-content: center;
 }
 
 .dice-count-3 .dice-views {
   grid-template-columns: repeat(3, 300px);
+  justify-content: center;
 }
 
 .dice-count-4 .dice-views,
@@ -286,6 +325,7 @@ defineExpose({
   grid-template-columns: repeat(auto-fit, 300px);
   max-width: 1200px;
   margin: 0 auto;
+  justify-content: center;
 }
 
 @media (max-width: 1200px) {
@@ -298,6 +338,11 @@ defineExpose({
     width: 250px;
     height: 250px;
   }
+
+  .single-die .dice-container {
+    width: 250px;
+    height: 250px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -306,6 +351,11 @@ defineExpose({
   }
 
   .dice-container {
+    width: 200px;
+    height: 200px;
+  }
+
+  .single-die .dice-container {
     width: 200px;
     height: 200px;
   }
