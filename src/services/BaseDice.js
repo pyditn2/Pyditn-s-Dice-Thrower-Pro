@@ -20,7 +20,7 @@ export class BaseDice {
   createNumberTexture(number) {
     // Create high-res canvas for better anti-aliasing
     const canvas = document.createElement('canvas')
-    const size = 1024  // Increased size significantly
+    const size = 512
     canvas.width = size
     canvas.height = size
     const ctx = canvas.getContext('2d')
