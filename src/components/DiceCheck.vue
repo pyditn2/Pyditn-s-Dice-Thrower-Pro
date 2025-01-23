@@ -134,11 +134,11 @@ const checkCriticalRolls = (rolls) => {
 
 const rollDamage = async (weapon, tempBonus = 0, hand = 'primary') => {
   const { diceCount, diceType, modifier } = weapon.tp
-  
+
   diceRoller1.value.updateViewMode(true)
   const appearance = diceAppearanceStore.getD6Appearance('damage')
   const rolls = await diceRoller1.value.rollDice(`d${diceType}`, diceCount, appearance)
-  
+
   const damage = rolls.reduce((sum, roll) => sum + roll, 0) + modifier + tempBonus
 
   if (result.value.isDualWielding) {
@@ -212,8 +212,8 @@ const performCheck = async () => {
       if (!talent) return
 
       diceRoller1.value.updateViewMode(true)
-      
-      const appearances = talent.attributes.map(attribute => 
+
+      const appearances = talent.attributes.map(attribute =>
         diceAppearanceStore.getD20Appearance(
           CHECK_TYPES.TALENT,
           diceAppearanceStore.preferences.useTalentColors ? null : attribute
@@ -341,7 +341,7 @@ const performCheck = async () => {
 const performWeaponCheck = async (weapon, tempATBonus, tempDamageBonus, hand) => {
   const appearance = diceAppearanceStore.getD20Appearance(CHECK_TYPES.COMBAT)
   const roll = await diceRoller1.value.rollDice('d20', 1, appearance)
-  
+
   const baseAttackValue = weapon.at + weapon.atBonus
   const attackValue = baseAttackValue + tempATBonus
 
@@ -447,17 +447,14 @@ watch(currentCheckType, (newType) => {
         <div v-if="currentCheckType === CHECK_TYPES.COMBAT" class="weapon-selection">
           <!-- Primary weapon -->
           <div class="weapon-primary">
-            <SearchableDropdown 
-              v-model="selectedWeapon" 
-              :items="weapons" 
-              :display-field="(item) => item.name"
-              :value-field="(item) => item.id" 
-              placeholder="Hauptwaffe aussuchen..." 
-            />
+            <SearchableDropdown v-model="selectedWeapon" :items="weapons" :display-field="(item) => item.name"
+              :value-field="(item) => item.id" placeholder="Hauptwaffe aussuchen..." />
 
             <div v-if="selectedWeapon" class="weapon-info">
               <div>AT: {{ selectedWeapon.at + selectedWeapon.atBonus }}</div>
-              <div>Schaden: {{ selectedWeapon.tp.diceCount }}W{{ selectedWeapon.tp.diceType }}+{{ selectedWeapon.tp.modifier }}</div>
+              <div>Schaden: {{ selectedWeapon.tp.diceCount }}W{{ selectedWeapon.tp.diceType }}+{{
+                selectedWeapon.tp.modifier
+              }}</div>
             </div>
 
             <!-- Primary weapon bonuses -->
@@ -483,17 +480,13 @@ watch(currentCheckType, (newType) => {
 
           <!-- Secondary weapon (shown when dual wielding) -->
           <div v-if="isDualWielding" class="weapon-secondary">
-            <SearchableDropdown 
-              v-model="selectedSecondaryWeapon" 
-              :items="weapons" 
-              :display-field="(item) => item.name"
-              :value-field="(item) => item.id" 
-              placeholder="Nebenwaffe aussuchen..." 
-            />
+            <SearchableDropdown v-model="selectedSecondaryWeapon" :items="weapons" :display-field="(item) => item.name"
+              :value-field="(item) => item.id" placeholder="Nebenwaffe aussuchen..." />
 
             <div v-if="selectedSecondaryWeapon" class="weapon-info">
               <div>AT: {{ selectedSecondaryWeapon.at + selectedSecondaryWeapon.atBonus }}</div>
-              <div>Schaden: {{ selectedSecondaryWeapon.tp.diceCount }}W{{ selectedSecondaryWeapon.tp.diceType }}+{{ selectedSecondaryWeapon.tp.modifier }}</div>
+              <div>Schaden: {{ selectedSecondaryWeapon.tp.diceCount }}W{{ selectedSecondaryWeapon.tp.diceType }}+{{
+                selectedSecondaryWeapon.tp.modifier }}</div>
             </div>
 
             <!-- Secondary weapon bonuses -->
@@ -504,7 +497,8 @@ watch(currentCheckType, (newType) => {
               </div>
               <div class="bonus-input">
                 <label for="tempSecondaryDamage">Temp. TP Bonus:</label>
-                <input id="tempSecondaryDamage" type="number" v-model.number="tempSecondaryDamageBonus" class="bonus-number" />
+                <input id="tempSecondaryDamage" type="number" v-model.number="tempSecondaryDamageBonus"
+                  class="bonus-number" />
               </div>
             </div>
           </div>
@@ -533,8 +527,8 @@ watch(currentCheckType, (newType) => {
 
       <!-- Result display -->
       <div v-if="result" class="result" :class="{
-        success: result.isDualWielding ? 
-          (result.primary?.success || result.secondary?.success) : 
+        success: result.isDualWielding ?
+          (result.primary?.success || result.secondary?.success) :
           result.success,
         critical: result.critical && result.success,
         fumble: result.critical && !result.success
@@ -571,7 +565,10 @@ watch(currentCheckType, (newType) => {
           <!-- Dual wielding results -->
           <template v-if="result.isDualWielding">
             <!-- Primary weapon result -->
-            <div class="weapon-result primary">
+            <div class="weapon-result" :class="[
+              'primary',
+              result.primary.success ? 'hit' : 'miss'
+            ]">
               <h3>Hauptwaffe: {{ result.primary.weapon }}</h3>
               <div class="success-indicator">
                 {{ result.primary.critical || (result.primary.success ? 'Erfolg!' : 'Misserfolg!') }}
@@ -582,7 +579,7 @@ watch(currentCheckType, (newType) => {
                 {{ result.primary.tempATBonus ? ` + ${result.primary.tempATBonus}` : '' }}
                 = {{ result.primary.target }}
               </div>
-              
+
               <template v-if="result.primary.success">
                 <!-- Primary weapon damage roll section -->
                 <div v-if="!result.primary.damageRolls" class="damage-roll-section">
@@ -616,7 +613,10 @@ watch(currentCheckType, (newType) => {
             </div>
 
             <!-- Secondary weapon result -->
-            <div class="weapon-result secondary">
+            <div class="weapon-result" :class="[
+              'secondary',
+              result.secondary.success ? 'hit' : 'miss'
+            ]">
               <h3>Nebenwaffe: {{ result.secondary.weapon }}</h3>
               <div class="success-indicator">
                 {{ result.secondary.critical || (result.secondary.success ? 'Erfolg!' : 'Misserfolg!') }}
@@ -627,11 +627,12 @@ watch(currentCheckType, (newType) => {
                 {{ result.secondary.tempATBonus ? ` + ${result.secondary.tempATBonus}` : '' }}
                 = {{ result.secondary.target }}
               </div>
-              
+
               <template v-if="result.secondary.success">
                 <!-- Secondary weapon damage roll section -->
                 <div v-if="!result.secondary.damageRolls" class="damage-roll-section">
-                  <button class="damage-roll-button" @click="rollDamage(selectedSecondaryWeapon, tempSecondaryDamageBonus, 'secondary')">
+                  <button class="damage-roll-button"
+                    @click="rollDamage(selectedSecondaryWeapon, tempSecondaryDamageBonus, 'secondary')">
                     Schaden würfeln
                   </button>
                 </div>
@@ -891,6 +892,7 @@ watch(currentCheckType, (newType) => {
   margin: 0.5rem 0;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid transparent;
 }
 
 .weapon-result h3 {
@@ -898,12 +900,20 @@ watch(currentCheckType, (newType) => {
   margin-bottom: 0.5rem;
 }
 
-.weapon-result.primary {
-  border-left: 3px solid #42b983;
+.weapon-result.primary.hit {
+  border-left-color: #42b983;
 }
 
-.weapon-result.secondary {
-  border-left: 3px solid #b94242;
+.weapon-result.primary.miss {
+  border-left-color: #b94242;
+}
+
+.weapon-result.secondary.hit {
+  border-left-color: #42b983;
+}
+
+.weapon-result.secondary.miss {
+  border-left-color: #b94242;
 }
 
 /* Adjust spacing between weapon results */
