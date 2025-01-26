@@ -1,6 +1,6 @@
 // ActionButtons.vue
 <script setup>
-import { computed, defineProps, defineEmits } from 'vue'
+import { computed } from 'vue'
 import { CHECK_TYPES } from '../constants/diceTypes'
 
 const props = defineProps({
