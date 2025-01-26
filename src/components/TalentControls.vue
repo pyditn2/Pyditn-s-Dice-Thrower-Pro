@@ -33,8 +33,8 @@ const updateTalent = (newValue) => {
       placeholder="Talent aussuchen..."
     />
 
-    <!-- Display talent info if a talent is selected -->
-    //Might put stuff here later
+    <!-- Display talent info if a talent is selected //Might put stuff here later -->
+    
   </div>
 </template>
 
