@@ -1,314 +1,134 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
-import * as THREE from 'three'
 import { useBackgroundStore } from '../stores/backgroundStore'
 import { storeToRefs } from 'pinia'
 
 const backgroundStore = useBackgroundStore()
 const { hexagonColor, squareColor } = storeToRefs(backgroundStore)
-
 const containerRef = ref(null)
+let worker = null;
 
 const backgroundClass = computed(() => {
   return backgroundStore.currentBackground === 'animiert' ? 'grey-background' : ''
-})
-
-// Three.js variables
-let scene, camera, renderer, clock, shapes = [], circleGroup
-let isAnimating = false
-const rotationSpeed = 0.005/2 // Rotations per second
-
-// Create d20 shape
-function createHexagon() {
-  const geometry = new THREE.IcosahedronGeometry(4)
-  const material = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(hexagonColor.value),
-    metalness: 0.9,
-    roughness: 0.1,
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.01,
-    reflectivity: 1,
-    flatShading: false,
-    envMapIntensity: 1.0
-  })
-  
-  const mesh = new THREE.Mesh(geometry, material)
-  mesh.userData.rotationSpeed = {
-    x: (Math.random() - 0.5) * 0.001,
-    y: (Math.random() - 0.5) * 0.001,
-    z: (Math.random() - 0.5) * 0.001
-  }
-  
-  return mesh
-}
-
-function createSquare() {
-  const geometry = new THREE.BoxGeometry(6, 6, 6)
-  const material = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(squareColor.value),
-    metalness: 0.9,
-    roughness: 0.1,
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.01,
-    reflectivity: 1,
-    flatShading: false,
-    envMapIntensity: 1.0
-  })
-  
-  const mesh = new THREE.Mesh(geometry, material)
-  mesh.userData.rotationSpeed = {
-    x: (Math.random() - 0.5) * 0.001,
-    y: (Math.random() - 0.5) * 0.001,
-    z: (Math.random() - 0.5) * 0.001
-  }
-  
-  return mesh
-}
-
-function createHighlightLight(position) {
-  const light = new THREE.SpotLight(0xffffff, 150)
-  light.position.set(400, 400, 200)  
-  light.angle = Math.PI / 6 
-  light.penumbra = 0.1
-  light.decay = 0.5
-  light.distance = 1500
-  
-  // Create target object that will follow the shape
-  const target = new THREE.Object3D()
-  target.position.copy(position)
-  scene.add(target)
-  light.target = target
-  
-  // Don't cast shadows from these individual lights to save performance
-  light.castShadow = false
-  
-  return { light, target }
-}
-
-// Modified createShapes function
-function createShapes() {
-  const numShapes = 40
-  const radius = 120
-  
-  for (let i = 0; i < numShapes; i++) {
-    const isHexagon = i % 2 === 0
-    const shape = isHexagon ? createHexagon() : createSquare()
-    
-    // Position shape in a circle
-    const angle = (i / numShapes) * Math.PI * 2
-    const x = Math.cos(angle) * radius
-    const y = Math.sin(angle) * radius
-    shape.position.set(x, y, 0)
-    
-    // Create dedicated spotlight for this shape
-    const { light, target } = createHighlightLight(shape.position)
-    scene.add(light)
-    
-    // Store the target reference with the shape for updates
-    shape.userData.lightTarget = target
-    
-    shapes.push(shape)
-    circleGroup.add(shape)
-  }
-}
-
-// Initialize Three.js scene
-function initScene() {
-  scene = new THREE.Scene()
-  camera = new THREE.PerspectiveCamera(10, window.innerWidth / window.innerHeight, 0.1, 1000)
-  renderer = new THREE.WebGLRenderer({ 
-    antialias: true, 
-    alpha: true,
-    powerPreference: "high-performance" 
-  })
-  clock = new THREE.Clock()
-  
-  // Setup renderer
-  renderer.setSize(window.innerWidth, window.innerHeight)
-  renderer.setClearColor(0x000000, 0)
-  renderer.setPixelRatio(window.devicePixelRatio)
-  renderer.physicallyCorrectLights = true
-  
-  const canvas = renderer.domElement
-  canvas.addEventListener('contextmenu', (e) => {
-    e.stopPropagation()
-  })
-  
-  containerRef.value.appendChild(canvas)
-  
-  // Setup camera
-  camera.position.z = 600
-  camera.position.y = -30
-
-  // Create a camera-following spot light for front-facing specular highlights
-  const keyLight = new THREE.RectAreaLight(0xffffff, 40, 1000, 1000)
-  keyLight.position.set(400, 400, 200)
-  keyLight.lookAt(0, 60, 0)
-  scene.add(keyLight)
-
-  // Camera-following fill light
-  const frontSpotLight = new THREE.SpotLight(0xffffff, 100)
-  frontSpotLight.angle = Math.PI / 4
-  frontSpotLight.penumbra = 0.2
-  frontSpotLight.decay = 0.5
-  frontSpotLight.distance = 1500
-  scene.add(frontSpotLight)
-
-  const frontTarget = new THREE.Object3D()
-  scene.add(frontTarget)
-  frontSpotLight.target = frontTarget
-
-  // Ambient light for base illumination
-  const ambientLight = new THREE.AmbientLight(0xffffff, 1.5)
-  scene.add(ambientLight)
-
-  function updateLights() {
-    // Update camera-following light
-    frontSpotLight.position.copy(camera.position)
-    frontSpotLight.position.y += 50
-    frontTarget.position.set(0, 60, 0)
-    
-    // Update individual spotlight targets
-    shapes.forEach((shape) => {
-      if (shape.userData.lightTarget) {
-        // Convert shape's world position to the target position
-        const worldPos = new THREE.Vector3()
-        shape.getWorldPosition(worldPos)
-        shape.userData.lightTarget.position.copy(worldPos)
-      }
-    })
-  }
-
-  // Modified animate function
-  animate = function() {
-    if (!isAnimating) return
-    
-    requestAnimationFrame(animate)
-    updateLights()
-    
-    const delta = clock.getDelta()
-    circleGroup.rotation.z += rotationSpeed * delta * Math.PI * 2
-    
-    shapes.forEach((shape) => {
-      shape.rotation.x += shape.userData.rotationSpeed.x
-      shape.rotation.y += shape.userData.rotationSpeed.y
-      shape.rotation.z += shape.userData.rotationSpeed.z
-    })
-    
-    renderer.render(scene, camera)
-  }
-  
-  // Create group for shapes
-  circleGroup = new THREE.Group()
-  circleGroup.position.y = 60
-  scene.add(circleGroup)
-  
-  createShapes()
-}
-
-// Animation loop
-function animate() {
-  if (!isAnimating || !clock || !renderer || !scene || !camera) return
-  
-  requestAnimationFrame(animate)
-  
-  const delta = clock.getDelta()
-  if (circleGroup) {
-    circleGroup.rotation.z += rotationSpeed * delta * Math.PI * 2
-    
-    // Update each shape's individual rotation
-    shapes.forEach((shape) => {
-      if (shape) {
-        shape.rotation.x += shape.userData.rotationSpeed.x
-        shape.rotation.y += shape.userData.rotationSpeed.y
-        shape.rotation.z += shape.userData.rotationSpeed.z
-      }
-    })
-  }
-  
-  renderer.render(scene, camera)
-}
+});
 
 // Handle window resize
 function onWindowResize() {
-  const width = window.innerWidth
-  const height = window.innerHeight
+  if (!worker || !canvas) return;
   
-  camera.aspect = width / height
-  camera.updateProjectionMatrix()
-  
-  renderer.setSize(width, height)
+  const dpr = window.devicePixelRatio || 1;
+  const newWidth = Math.floor(window.innerWidth * dpr);
+  const newHeight = Math.floor(window.innerHeight * dpr);
+
+  // Update canvas dimensions
+  canvas.style.width = `${window.innerWidth}px`;
+  canvas.style.height = `${window.innerHeight}px`;
+  canvas.width = newWidth;
+  canvas.height = newHeight;
+
+  worker.postMessage({
+    type: 'resize',
+    width: newWidth,
+    height: newHeight,
+    dpr: dpr
+  });
 }
 
-// Cleanup function
-function cleanup() {
-  isAnimating = false
-  window.removeEventListener('resize', onWindowResize)
-  
-  // Dispose of geometries and materials
-  shapes.forEach((shape) => {
-    shape.geometry.dispose()
-    shape.material.dispose()
-  })
-  
-  // Remove renderer
-  if (renderer) {
-    renderer.dispose()
-    if (containerRef.value) {
-      containerRef.value.removeChild(renderer.domElement)
-    }
-  }
-}
+watch([hexagonColor, squareColor], ([newHex, newSquare]) => {
+  worker?.postMessage({
+    type: 'colors',
+    hex: newHex,
+    square: newSquare
+  });
+});
 
-// Watch for background changes
 watch(
   () => backgroundStore.currentBackground,
   (newValue) => {
-    isAnimating = newValue === 'animiert'
-    if (isAnimating && clock && scene && camera && renderer) {
-      animate()
-    }
-  },
-  { immediate: true }
-)
-
-watch([hexagonColor, squareColor], ([newHexColor, newSquareColor]) => {
-  shapes.forEach((shape, index) => {
-    const isHexagon = index % 2 === 0
-    const newColor = isHexagon ? newHexColor : newSquareColor
-    shape.material.color.set(newColor)
-  })
-})
-
-// Component lifecycle hooks
-onMounted(() => {
-  if (containerRef.value) {
-    initScene()
-    window.addEventListener('resize', onWindowResize)
-    // Only start animation if background is set to 'animiert'
-    if (backgroundStore.currentBackground === 'animiert') {
-      isAnimating = true
-      animate()
-    }
+    const shouldAnimate = newValue === 'animiert';
+    worker?.postMessage({
+      type: 'animate',
+      value: shouldAnimate
+    });
   }
-})
+);
+
+onMounted(async () => {
+  try {
+    const canvas = document.createElement('canvas');
+    console.log('Main thread - Canvas created:', canvas);
+
+    // Set dimensions with device pixel ratio
+    const dpr = window.devicePixelRatio || 1;
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    console.log('Main thread - Canvas dimensions set:', canvas.width, canvas.height);
+
+    containerRef.value.appendChild(canvas);
+    console.log('Main thread - Canvas appended to DOM');
+    window.addEventListener('resize', onWindowResize); // Add this
+    onWindowResize(); // Initial size set
+    worker = new Worker(
+      new URL('../workers/three.worker.js', import.meta.url),
+      { type: 'module', name: 'ThreeJSWorker' }
+    );
+    console.log('Main thread - Worker created');
+
+    worker.postMessage({
+      type: 'colors',
+      hex: hexagonColor.value,
+      square: squareColor.value
+    });
+
+    worker.postMessage({
+      type: 'animate',
+      value: backgroundStore.currentBackground === 'animiert'
+    });
+
+    // Add this to handle initial animation state
+    if (backgroundStore.currentBackground === 'animiert') {
+      requestAnimationFrame(() => {
+        worker.postMessage({ type: 'animate', value: true });
+      });
+    }
+
+    worker.onerror = (error) => {
+      console.error('Main thread - Worker error:', error);
+    };
+
+    const offscreen = canvas.transferControlToOffscreen();
+    console.log('Main thread - OffscreenCanvas created:', offscreen);
+
+    worker.postMessage({
+      type: 'init',
+      canvas: offscreen,
+      width: canvas.width,
+      height: canvas.height,
+      dpr: dpr,
+      hex: hexagonColor.value,
+      square: squareColor.value,
+      // Add device pixel ratio
+      devicePixelRatio: window.devicePixelRatio
+    }, [offscreen]);
+    console.log('Main thread - Init message sent');
+
+  } catch (error) {
+    console.error('Main thread - Initialization failed:', error);
+  }
+});
 
 onBeforeUnmount(() => {
-  cleanup()
-})
+  window.removeEventListener('resize', onWindowResize);
+
+});
 </script>
 
 <template>
-  <div 
-    class="background" 
-    :class="backgroundClass"
-  >
-    <div 
-      ref="containerRef" 
-      class="three-background"
-      :class="{ 'hidden': backgroundStore.currentBackground !== 'animiert' }"
-      @contextmenu="$event.stopPropagation()"
-    >
+  <div class="background" :class="backgroundClass">
+    <div ref="containerRef" class="three-background"
+      :class="{ 'hidden': backgroundStore.currentBackground !== 'animiert' }" @contextmenu="$event.stopPropagation()">
     </div>
   </div>
 </template>
@@ -335,6 +155,6 @@ onBeforeUnmount(() => {
 }
 
 .hidden {
-  visibility: hidden;
+  display: none !important;
 }
 </style>
