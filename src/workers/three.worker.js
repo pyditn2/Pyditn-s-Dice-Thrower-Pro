@@ -94,7 +94,9 @@ function initScene(data) {
         } catch (error) {
             throw new Error(`Scene setup failed: ${error.message}`);
         }
-        circleGroup.position.set(0, 0, 0);
+        if (circleGroup) {
+            circleGroup.position.set(0, 60, 0);
+        }
         // Initialize animation clock
         clock = new THREE.Clock();
         debugLog('Scene initialization complete');
@@ -231,23 +233,39 @@ self.onmessage = function (e) {
                 initScene(e.data);
                 break;
 
-            case 'resize':
-                if (!camera || !renderer) break;
-
-                // Update renderer size first
-                renderer.setSize(e.data.width, e.data.height, false);
-
-                // Update camera aspect ratio
-                camera.aspect = e.data.width / e.data.height;
-                camera.updateProjectionMatrix();
-
-                // Reset camera position to original values (no horizontal offset)
-                camera.position.set(0, -30, 600);
-                camera.lookAt(0, 60, 0);
-
-                debugLog(`Resized to ${e.data.width}x${e.data.height}`);
+                case 'resize':
+                    if (!renderer) {
+                        debugLog('Worker: Renderer not initialized');
+                        break;
+                    }
+                    
+                    const { width, height, dpr, windowWidth, windowHeight, hex, square } = e.data;
+                    
+                    // Clean up everything
+                    cleanup();
+                    
+                    // Create fresh scene with initial setup - exact same parameters as boot
+                    scene = null;
+                    camera = null;
+                    shapes = [];
+                    circleGroup = null;
+                    clock = null;
+                    isAnimating = false;
+                    
+                    // Call initScene with exactly the same parameters as initial startup
+                    initScene({
+                        canvas: renderer.domElement,
+                        width: width,
+                        height: height,
+                        dpr: dpr,
+                        windowWidth: windowWidth,
+                        windowHeight: windowHeight,
+                        hex: hex,
+                        square: square
+                    });
+                    
+                    debugLog('Worker: Fresh scene initialized after resize');
                 break;
-
             case 'animate':
                 isAnimating = Boolean(e.data.value);
                 debugLog(`Animation ${isAnimating ? 'started' : 'stopped'}`);
@@ -272,7 +290,7 @@ self.onmessage = function (e) {
 // Animation loop
 function animate() {
     try {
-        if (!isAnimating || !scene || !camera || !renderer) return;
+        if (!isAnimating || !scene || !camera || !renderer || !circleGroup) return;
 
         const delta = clock.getDelta();
 
@@ -328,15 +346,33 @@ function updateMaterialColors() {
 // Cleanup
 function cleanup() {
     debugLog('Cleaning up resources...');
-    shapes.forEach(shape => {
-        shape.geometry.dispose();
-        shape.material.dispose();
-    });
-    renderer?.dispose();
+    
+    if (scene) {
+        // Dispose of all geometries and materials
+        scene.traverse((object) => {
+            if (object.geometry) {
+                object.geometry.dispose();
+            }
+            if (object.material) {
+                if (Array.isArray(object.material)) {
+                    object.material.forEach(material => material.dispose());
+                } else {
+                    object.material.dispose();
+                }
+            }
+        });
+        scene.clear();
+    }
+    
+    // Clear arrays and null objects
+    shapes = [];
+    circleGroup = null;
     scene = null;
     camera = null;
+    clock = null;
+    isAnimating = false;
+    
     debugLog('Cleanup complete');
 }
-
 // Initialization complete
 debugLog('Worker script loaded');

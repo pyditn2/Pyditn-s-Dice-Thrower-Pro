@@ -7,6 +7,7 @@ const backgroundStore = useBackgroundStore()
 const { hexagonColor, squareColor } = storeToRefs(backgroundStore)
 const containerRef = ref(null)
 let worker = null;
+let canvas = null;
 
 const backgroundClass = computed(() => {
   return backgroundStore.currentBackground === 'animiert' ? 'grey-background' : ''
@@ -14,23 +15,66 @@ const backgroundClass = computed(() => {
 
 // Handle window resize
 function onWindowResize() {
-  if (!worker || !canvas) return;
+  if (!worker) return;
   
+  // 1. Terminate existing worker
+  worker.terminate();
+  
+  // 2. Create fresh canvas
   const dpr = window.devicePixelRatio || 1;
-  const newWidth = Math.floor(window.innerWidth * dpr);
-  const newHeight = Math.floor(window.innerHeight * dpr);
-
-  // Update canvas dimensions
+  const initialWidth = Math.floor(window.innerWidth * dpr);
+  const initialHeight = Math.floor(window.innerHeight * dpr);
+  
+  canvas = document.createElement('canvas');
   canvas.style.width = `${window.innerWidth}px`;
   canvas.style.height = `${window.innerHeight}px`;
-  canvas.width = newWidth;
-  canvas.height = newHeight;
+  canvas.width = initialWidth;
+  canvas.height = initialHeight;
+  
+  // Clear container and add new canvas
+  if (containerRef.value) {
+    containerRef.value.innerHTML = '';
+    containerRef.value.appendChild(canvas);
+  }
+  
+  // 3. Create new worker
+  worker = new Worker(
+    new URL('../workers/three.worker.js', import.meta.url),
+    { type: 'module', name: 'ThreeJSWorker' }
+  );
 
+  worker.onerror = (error) => {
+    console.error('Main thread - Worker error:', error);
+  };
+  
+  // 4. Transfer canvas control
+  const offscreen = canvas.transferControlToOffscreen();
+  
+  // 5. Send init message
   worker.postMessage({
-    type: 'resize',
-    width: newWidth,
-    height: newHeight,
-    dpr: dpr
+    type: 'init',
+    canvas: offscreen,
+    width: initialWidth,
+    height: initialHeight,
+    dpr: dpr,
+    hex: hexagonColor.value,
+    square: squareColor.value,
+    windowWidth: window.innerWidth,
+    windowHeight: window.innerHeight
+  }, [offscreen]);
+  
+  // 6. Send colors
+  worker.postMessage({
+    type: 'colors',
+    hex: hexagonColor.value,
+    square: squareColor.value
+  });
+
+  // 7. Send animation state
+  const shouldAnimate = backgroundStore.currentBackground === 'animiert';
+  worker.postMessage({
+    type: 'animate',
+    value: shouldAnimate
   });
 }
 
@@ -55,64 +99,68 @@ watch(
 
 onMounted(async () => {
   try {
-    const canvas = document.createElement('canvas');
+    canvas = document.createElement('canvas');
     console.log('Main thread - Canvas created:', canvas);
 
     // Set dimensions with device pixel ratio
     const dpr = window.devicePixelRatio || 1;
+    const initialWidth = Math.floor(window.innerWidth * dpr);
+    const initialHeight = Math.floor(window.innerHeight * dpr);
+    
     canvas.style.width = `${window.innerWidth}px`;
     canvas.style.height = `${window.innerHeight}px`;
-    canvas.width = Math.floor(window.innerWidth * dpr);
-    canvas.height = Math.floor(window.innerHeight * dpr);
-    console.log('Main thread - Canvas dimensions set:', canvas.width, canvas.height);
+    canvas.width = initialWidth;
+    canvas.height = initialHeight;
+    
+    console.log('Main thread - Canvas dimensions set:', initialWidth, initialHeight);
 
     containerRef.value.appendChild(canvas);
     console.log('Main thread - Canvas appended to DOM');
-    window.addEventListener('resize', onWindowResize); // Add this
-    onWindowResize(); // Initial size set
+    
+    // Create worker first
     worker = new Worker(
       new URL('../workers/three.worker.js', import.meta.url),
       { type: 'module', name: 'ThreeJSWorker' }
     );
     console.log('Main thread - Worker created');
 
+    // Add resize listener after worker is created
+    window.addEventListener('resize', onWindowResize);
+
+    // Transfer canvas control to worker
+    const offscreen = canvas.transferControlToOffscreen();
+    console.log('Main thread - OffscreenCanvas created:', offscreen);
+
+    // Send init message with all initial settings
+    worker.postMessage({
+      type: 'init',
+      canvas: offscreen,
+      width: initialWidth,
+      height: initialHeight,
+      dpr: dpr,
+      hex: hexagonColor.value,
+      square: squareColor.value,
+      windowWidth: window.innerWidth,
+      windowHeight: window.innerHeight
+    }, [offscreen]);
+    
+    // Send initial color values
     worker.postMessage({
       type: 'colors',
       hex: hexagonColor.value,
       square: squareColor.value
     });
 
+    // Set initial animation state
+    const shouldAnimate = backgroundStore.currentBackground === 'animiert';
     worker.postMessage({
       type: 'animate',
-      value: backgroundStore.currentBackground === 'animiert'
+      value: shouldAnimate
     });
-
-    // Add this to handle initial animation state
-    if (backgroundStore.currentBackground === 'animiert') {
-      requestAnimationFrame(() => {
-        worker.postMessage({ type: 'animate', value: true });
-      });
-    }
 
     worker.onerror = (error) => {
       console.error('Main thread - Worker error:', error);
     };
-
-    const offscreen = canvas.transferControlToOffscreen();
-    console.log('Main thread - OffscreenCanvas created:', offscreen);
-
-    worker.postMessage({
-      type: 'init',
-      canvas: offscreen,
-      width: canvas.width,
-      height: canvas.height,
-      dpr: dpr,
-      hex: hexagonColor.value,
-      square: squareColor.value,
-      // Add device pixel ratio
-      devicePixelRatio: window.devicePixelRatio
-    }, [offscreen]);
-    console.log('Main thread - Init message sent');
 
   } catch (error) {
     console.error('Main thread - Initialization failed:', error);
