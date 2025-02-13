@@ -16,7 +16,7 @@ const props = defineProps({
   },
   placeholder: {
     type: String,
-    default: 'Search or select...'
+    default: 'Durchsuchen...'
   },
   modelValue: {
     type: [Object, String, Number],
