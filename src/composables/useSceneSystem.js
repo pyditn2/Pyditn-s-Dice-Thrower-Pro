@@ -1,7 +1,10 @@
 import { ref, markRaw } from 'vue'
 import * as THREE from 'three'
 import RAPIER from '@dimforge/rapier3d-compat'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
+// Add this to the top-level variables
+const tableModel = ref(null)
 const diceWireframes = ref([])
 
 const GRAVITY = -25
@@ -274,7 +277,121 @@ export const useSceneSystem = () => {
     wireframeHelpers.value.push(wallHelper)
   }
 
+  const loadTableModel = async () => {
+    // If table is already loaded, just return it
+    if (tableModel.value) {
+      console.log('Table already loaded, reusing existing model')
+      return tableModel.value
+    }
+
+    return new Promise((resolve, reject) => {
+      const loader = new GLTFLoader()
+      
+      // Let's try multiple potential file paths
+      const potentialPaths = [
+        './src/assets/models/Table PDTP.glb', // This is the actual path shown in the file structure
+        '/src/assets/models/Table PDTP.glb',
+        'src/assets/models/Table PDTP.glb',
+        './assets/models/Table PDTP.glb',
+        '/assets/models/Table PDTP.glb',
+        './Table PDTP.glb',
+        '/Table PDTP.glb',
+        'Table PDTP.glb'
+      ]
+      
+      // Try loading from each path
+      function tryNextPath(pathIndex) {
+        if (pathIndex >= potentialPaths.length) {
+          // If we've tried all paths, reject with a clear error
+          reject(new Error('Could not find the table model at any of the attempted paths. Please check file location and name.'))
+          return
+        }
+        
+        const currentPath = potentialPaths[pathIndex]
+        console.log('Attempting to load table model from:', currentPath)
+        
+        loader.load(
+          currentPath,
+          // Called when the resource is loaded
+          (gltf) => {
+            const loadedTable = gltf.scene
+            
+            // Mark the model as raw to prevent Vue reactivity issues
+            markRaw(loadedTable)
+            
+            // Add user data for identification
+            loadedTable.userData.isTable = true
+            
+            // Position the table underneath the dice bowl
+            loadedTable.position.set(0, -35.8, 0)
+            
+            // Adjust the scale to make the table properly sized
+            loadedTable.scale.set(17, 17, 17)
+
+            loadedTable.rotation.y = -(Math.PI / 2)
+            
+            // Apply shadows
+            loadedTable.traverse((child) => {
+              if (child.isMesh) {
+                child.castShadow = true
+                child.receiveShadow = true
+                
+                // Ensure materials are properly configured for shadows
+                if (child.material) {
+                  child.material.shadowSide = THREE.FrontSide;
+                }
+              }
+            })
+            
+            // Add the model to the scene
+            scene.value.add(loadedTable)
+            
+            // Store in our reactive reference
+            tableModel.value = loadedTable
+            
+            // Log the loaded model for debugging
+            console.log('Table model loaded successfully')
+            
+            resolve(loadedTable)
+          },
+          // Called while loading is progressing
+          (xhr) => {
+            console.log((xhr.loaded / xhr.total * 100) + '% loaded')
+          },
+          // Called when loading has errors
+          (error) => {
+            console.error(`Error loading from ${potentialPaths[pathIndex]}:`, error)
+            // Try the next path
+            tryNextPath(pathIndex + 1)
+          }
+        )
+      }
+      
+      // Try the next path
+      tryNextPath(0)
+    })
+  }
+
   const initScene = async () => {
+    // If scene already exists, clean it up first
+    if (scene.value) {
+      console.log('Scene already exists, cleaning up before re-initialization');
+      
+      // Just clear children instead of full cleanup to avoid recursion
+      while (scene.value.children.length > 0) {
+        const child = scene.value.children[0];
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(m => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+        scene.value.remove(child);
+      }
+    }
+    
     // Mark the scene as raw to prevent Vue from making it reactive
     scene.value = markRaw(new THREE.Scene())
     
@@ -286,9 +403,22 @@ export const useSceneSystem = () => {
     world.value.timestep = 1/120
 
     createHexagonalGround()
+    
+    // Load the table model
+    try {
+      await loadTableModel()
+    } catch (error) {
+      console.error('Failed to load table model:', error)
+    }
   }
 
   const cleanupScene = () => {
+    // Check if scene exists before proceeding
+    if (!scene.value) {
+      console.warn('Attempted to clean up scene before it was initialized');
+      return;
+    }
+    
     // Dispose of dice wireframes
     diceWireframes.value.forEach(wireframe => {
       if (wireframe.geometry) wireframe.geometry.dispose();
@@ -297,6 +427,11 @@ export const useSceneSystem = () => {
     });
     diceWireframes.value = [];
   
+    // Temporarily remove table from scene without disposing it
+    if (tableModel.value && tableModel.value.parent === scene.value) {
+      scene.value.remove(tableModel.value);
+    }
+
     // Properly dispose of all scene objects
     scene.value.traverse((object) => {
       if (object instanceof THREE.Mesh) {
@@ -315,6 +450,11 @@ export const useSceneSystem = () => {
           }
         }
       }
+      
+      // Don't remove table - we're preserving it
+      if (object.userData && object.userData.isTable && object !== tableModel.value) {
+        scene.value.remove(object);
+      }
     });
   
     // Clear scene
@@ -326,6 +466,11 @@ export const useSceneSystem = () => {
     scene.value.add(setupMainLight());
     scene.value.add(new THREE.AmbientLight(0x404040));
     createHexagonalGround();
+    
+    // Re-add the table if it exists
+    if (tableModel.value) {
+      scene.value.add(tableModel.value);
+    }
   };
   
   const toggleWireframes = (diceManagerInstance) => {
@@ -342,6 +487,7 @@ export const useSceneSystem = () => {
     }
   }
 
+  // Make sure to include the loadTableModel method in the returned object
   return {
     scene,
     world,
@@ -349,6 +495,7 @@ export const useSceneSystem = () => {
     initScene,
     cleanupScene,
     toggleWireframes,
-    addDiceWireframe
+    addDiceWireframe,
+    loadTableModel // Export this method if you need to access it elsewhere
   }
 }
