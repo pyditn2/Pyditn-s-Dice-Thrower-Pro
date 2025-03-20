@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import RAPIER from '@dimforge/rapier3d-compat'
 import { CameraManager } from '../services/cameraManager'
+import * as THREE from 'three'
 
 // Import composables
 import { useDiceState } from '../composables/useDiceState'
@@ -52,6 +53,9 @@ const animate = (currentTime) => {
     cameraManager
   )
 
+  // Update sky animation - Add this line
+  sceneSystem.updateSkyAnimation(currentTime);
+
   if (cameraManager) {
     // Ensure we have enough cameras
     cameraManager.ensureCameraCount(diceState.dice.value.length)
@@ -89,6 +93,12 @@ const animate = (currentTime) => {
       if (index === 0 || diceState.showExtraViews.value) {
         const die = diceState.dice.value[index]
         if (die && currentScene) {
+          // Ensure cameras can see far enough (add this line)
+          if (cameras[index].far < 1000) {
+            cameras[index].far = 1000;
+            cameras[index].updateProjectionMatrix();
+          }
+          
           renderer.render(currentScene, cameras[index])
         }
       }
@@ -119,7 +129,7 @@ const rollDice = async (type, count, appearance = null) => {
   try {
     // Reset active containers for new roll
     activeContainers.value.clear()
-    
+
     if (count > maxDiceCount.value) {
       maxDiceCount.value = count
       isInitialized.value = false
@@ -202,6 +212,8 @@ const resetCamera = () => {
   }
 }
 
+
+
 onMounted(async () => {
   try {
     await RAPIER.init()
@@ -210,6 +222,16 @@ onMounted(async () => {
 
     cameraManager = new CameraManager(sceneSystem.scene.value, 300, 300)
     physicsSystem.resetPhysicsState()
+    
+    // Adjust camera settings for better skybox visibility
+    console.log('Adjusting cameras for skybox visibility');
+    const cameras = cameraManager.getCameras();
+    cameras.forEach((camera, index) => {
+      // Increase far plane to ensure skybox is visible
+      camera.far = 1000;
+      camera.updateProjectionMatrix();
+      console.log(`Camera ${index} far plane set to ${camera.far}`);
+    });
     
     // Setup collision events after world initialization
     physicsSystem.setupCollisionEvents(sceneSystem.world.value)
@@ -238,11 +260,59 @@ onBeforeUnmount(() => {
 })
 
 const handleKeydown = (event) => {
+  console.log('Key pressed:', event.key);
+  
   if (event.key.toLowerCase() === 'w') {
-    // Let's add a debug log to verify diceState.diceManager exists
-    console.log("DiceManager instance:", diceState.diceManager)
-    sceneSystem.toggleWireframes(diceState.diceManager)
+    console.log("DiceManager instance:", diceState.diceManager);
+    sceneSystem.toggleWireframes(diceState.diceManager);
+  } else if (event.key === '1') {
+    // Toggle between starry sky and solid color
+    console.log('Toggling between sky and solid color');
+    const currentScene = sceneSystem.scene.value;
+    
+    // If scene has a background color, switch to starry sky
+    if (currentScene.background) {
+      currentScene.background = null;
+      sceneSystem.createStarryNightSky();
+      console.log('Switched to starry night sky');
+    } else {
+      // If using starry sky, switch to solid color
+      sceneSystem.setColorBackground(0x00FF00); // Bright green for visibility
+      console.log('Switched to solid green background');
+    }
+    
+    // Force render update
+    forceRender();
+  } else if (event.key === '2') {
+    // Adjust camera distances to see more of the sky
+    if (cameraManager) {
+      console.log('Adjusting camera settings');
+      const cameras = cameraManager.getCameras();
+      cameras.forEach((camera, index) => {
+        camera.far = 1000;
+        camera.updateProjectionMatrix();
+        console.log(`Camera ${index} far plane increased to 2000`);
+      });
+      
+      forceRender();
+    }
   }
+}
+
+// Helper function to force all renderers to render
+const forceRender = () => {
+  const currentRenderers = diceState.renderers.value;
+  const currentScene = sceneSystem.scene.value;
+  const cameras = cameraManager?.getCameras() || [];
+  
+  console.log(`Forcing render with ${currentRenderers.length} renderers, ${cameras.length} cameras`);
+  
+  currentRenderers.forEach((renderer, index) => {
+    if (renderer && cameras[index]) {
+      console.log(`Forcing render for renderer ${index}`);
+      renderer.render(currentScene, cameras[index]);
+    }
+  });
 }
 
 defineExpose({
@@ -258,14 +328,9 @@ defineExpose({
     { 'single-die': maxDiceCount === 1 }
   ]">
     <div class="dice-views">
-      <div 
-        v-for="n in maxDiceCount" 
-        :key="n" 
-        :ref="el => initializeContainer(el, n - 1)" 
-        class="dice-container"
+      <div v-for="n in maxDiceCount" :key="n" :ref="el => initializeContainer(el, n - 1)" class="dice-container"
         :class="{ 'active': activeContainers.has(n - 1) }"
-        v-show="n === 1 || (diceState.showExtraViews && n <= diceState.dice.value.length)"
-      ></div>
+        v-show="n === 1 || (diceState.showExtraViews && n <= diceState.dice.value.length)"></div>
     </div>
   </div>
 </template>
