@@ -80,7 +80,7 @@ export const useSceneSystem = () => {
     for (let i = 0; i < 2000; i++) {
       const x = Math.random() * 1024;
       const y = Math.random() * 1024;
-      const size = Math.random() * 2; 
+      const size = 0.3 + Math.random() * 0.2; 
       ctx.beginPath();
       ctx.arc(x, y, size, 0, Math.PI * 0.3);
       ctx.fill();
@@ -90,7 +90,7 @@ export const useSceneSystem = () => {
     for (let i = 0; i < 50; i++) {
       const x = Math.random() * 1024;
       const y = Math.random() * 1024;
-      const size = 1.5 + Math.random() * 0.3;
+      const size = 0.5 + Math.random() * 0.3;
       
       // Create a glow effect
       const gradient = ctx.createRadialGradient(x, y, 0, x, y, size * 2);
@@ -423,14 +423,14 @@ export const useSceneSystem = () => {
       
       // Let's try multiple potential file paths
       const potentialPaths = [
-        './src/assets/models/Table PDTP.glb', // This is the actual path shown in the file structure
-        '/src/assets/models/Table PDTP.glb',
-        'src/assets/models/Table PDTP.glb',
-        './assets/models/Table PDTP.glb',
-        '/assets/models/Table PDTP.glb',
-        './Table PDTP.glb',
-        '/Table PDTP.glb',
-        'Table PDTP.glb'
+        './src/assets/models/Table PDTP1.glb', // This is the actual path shown in the file structure
+        '/src/assets/models/Table PDTP1.glb',
+        'src/assets/models/Table PDTP1.glb',
+        './assets/models/Table PDTP1.glb',
+        '/assets/models/Table PDTP1.glb',
+        './Table PDTP1.glb',
+        '/Table PDTP1.glb',
+        'Table PDTP1.glb'
       ]
       
       // Try loading from each path

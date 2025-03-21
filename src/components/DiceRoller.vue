@@ -227,7 +227,7 @@ onMounted(async () => {
     console.log('Adjusting cameras for skybox visibility');
     const cameras = cameraManager.getCameras();
     cameras.forEach((camera, index) => {
-      // Increase far plane to ensure skybox is visible
+      // Decrease far plane to avoid clipping skybox
       camera.far = 1000;
       camera.updateProjectionMatrix();
       console.log(`Camera ${index} far plane set to ${camera.far}`);
@@ -277,7 +277,7 @@ const handleKeydown = (event) => {
       console.log('Switched to starry night sky');
     } else {
       // If using starry sky, switch to solid color
-      sceneSystem.setColorBackground(0x00FF00); // Bright green for visibility
+      sceneSystem.setColorBackground(0x00FF00);
       console.log('Switched to solid green background');
     }
     
