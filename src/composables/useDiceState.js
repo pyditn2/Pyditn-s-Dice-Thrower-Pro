@@ -33,17 +33,29 @@ export const useDiceState = () => {
       }
     });
   
-    // Create new renderers with context loss handling
+    // Create new renderers with platform-specific settings
     renderers.value = containerRefs.map(() => {
+      // Better platform detection using userAgent
+      const isLinux = navigator.userAgent.toLowerCase().includes('linux');
+      
+      // Try with more compatible settings for all platforms, but especially for Linux
       const renderer = new THREE.WebGLRenderer({ 
-        antialias: true,
-        powerPreference: 'high-performance',
-        failIfMajorPerformanceCaveat: true
+        antialias: !isLinux,
+        powerPreference: 'default',
+        failIfMajorPerformanceCaveat: false, // Critical change: don't fail on low performance
+        alpha: true
       });
       
       renderer.setSize(300, 300);
-      renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      
+      // Only enable shadow maps if we're not on Linux
+      if (!isLinux) {
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      } else {
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.BasicShadowMap;
+      }
   
       // Add context loss handling
       renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
@@ -59,7 +71,7 @@ export const useDiceState = () => {
         container.innerHTML = '';
         container.appendChild(renderer.domElement);
       }
-    })
+    });
   }
 
   const handleContextLost = (event) => {
