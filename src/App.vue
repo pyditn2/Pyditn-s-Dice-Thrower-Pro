@@ -41,9 +41,14 @@ const activeTab = ref('dice')
 
     <!-- Tab Content -->
     <div class="tab-content">
+      <!-- Dice tab -->
       <CharacterSelector v-if="activeTab === 'dice'" />
       <DiceCheck v-if="activeTab === 'dice'" />
+      
+      <!-- Free dice tab - Add CharacterSelector here too -->
+      <CharacterSelector v-if="activeTab === 'free-dice'" />
       <FreeDiceRoller v-if="activeTab === 'free-dice'" />
+      
       <CharacterEditor v-if="activeTab === 'character'" />
     </div>
   </div>

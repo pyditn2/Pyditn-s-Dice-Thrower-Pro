@@ -1,5 +1,6 @@
 <script setup>
 import { useCharacterStore } from '../stores/characterStore'
+import ThrowPositionSelector from './ThrowPositionSelector.vue' // Add this import
 
 const characterStore = useCharacterStore()
 
@@ -15,35 +16,49 @@ const deleteCurrentCharacter = () => {
 </script>
 
 <template>
-  <div class="character-selection-bar">
-    <select 
-      v-model="characterStore.activeCharacterId"
-      @change="characterStore.setActiveCharacter($event.target.value)"
-      class="character-select"
-    >
-      <option value="">Charakter auswählen</option>
-      <option 
-        v-for="char in characterStore.characterList" 
-        :key="char.id" 
-        :value="char.id"
+  <div class="character-config-bar">
+    <div class="throw-position-container">
+      <ThrowPositionSelector :size="120" />
+    </div>
+    <div class="character-selection-bar">
+      <select 
+        v-model="characterStore.activeCharacterId"
+        @change="characterStore.setActiveCharacter($event.target.value)"
+        class="character-select"
       >
-        {{ char.name || 'Unbenannter Charakter' }}
-      </option>
-    </select>
-    <button @click="createNewCharacter" class="create-btn">Neuer Charakter</button>
-    <button 
-      @click="deleteCurrentCharacter"
-      :disabled="!characterStore.activeCharacterId"
-      class="delete-btn"
-    >
-      Charakter löschen
-    </button>
+        <option value="">Charakter auswählen</option>
+        <option 
+          v-for="char in characterStore.characterList" 
+          :key="char.id" 
+          :value="char.id"
+        >
+          {{ char.name || 'Unbenannter Charakter' }}
+        </option>
+      </select>
+      <button @click="createNewCharacter" class="create-btn">Neuer Charakter</button>
+      <button 
+        @click="deleteCurrentCharacter"
+        :disabled="!characterStore.activeCharacterId"
+        class="delete-btn"
+      >
+        Charakter löschen
+      </button>
+    </div>
+    
   </div>
 </template>
 
 <style scoped>
+.character-config-bar {
+  display: flex;
+  gap: 1rem;
+  margin: 0 auto 1rem;
+  justify-content: center;
+  align-items: flex-start;
+}
+
 .character-selection-bar {
-  margin: auto auto 1rem;
+  margin: 0;
   width: max-content;
   padding: 1rem;
   background: #1a1a1a;
@@ -51,6 +66,11 @@ const deleteCurrentCharacter = () => {
   display: flex;
   gap: 1rem;
   align-items: center;
+}
+
+.throw-position-container {
+  min-width: 250px;
+  max-width: 350px;
 }
 
 .character-select {
@@ -92,9 +112,20 @@ const deleteCurrentCharacter = () => {
 }
 
 @media (max-width: 768px) {
+  .character-config-bar {
+    flex-direction: column;
+    width: 100%;
+    align-items: center;
+  }
+
   .character-selection-bar {
     flex-direction: column;
     width: 92%;
+  }
+
+  .throw-position-container {
+    width: 92%;
+    max-width: 100%;
   }
 
   .character-select {

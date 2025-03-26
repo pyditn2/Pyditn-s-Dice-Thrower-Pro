@@ -2,12 +2,14 @@ import { ref, computed, markRaw } from 'vue'
 import * as THREE from 'three'
 import { DICE_INITIAL_CONFIG } from '../constants/diceTypes'
 import { DiceManager } from '../services/diceManager'
+import { useDiceRollerStore } from '../stores/diceRollerStore'
 
 export const useDiceState = () => {
   const dice = ref([])
   const rigidBodies = ref([])
   const settledDice = ref(new Set())
   const diceManager = new DiceManager()
+  const diceRollerStore = useDiceRollerStore()
 
   // Camera and renderer configuration
   const renderers = ref([])
@@ -106,27 +108,22 @@ export const useDiceState = () => {
 
   const createDiceInstance = (type, index, count, world, appearance = null) => {
     try {
-      const offset = {
-        x: (index - (count - 1) / 2) * DICE_INITIAL_CONFIG.spacing,
-        y: DICE_INITIAL_CONFIG.heightRange.min + 
-           Math.random() * (DICE_INITIAL_CONFIG.heightRange.max - DICE_INITIAL_CONFIG.heightRange.min),
-        z: Math.random() - 0.5
-      }
+      // Get position from diceRollerStore instead of using fixed offsets
+      const position = diceRollerStore.getThrowPosition(index, count)
+      
+      // Get velocity from diceRollerStore
+      const velocity = diceRollerStore.getThrowVelocity()
 
       // Pass appearance to DiceManager
       const { mesh, rigidBody } = diceManager.createDice(type, world, appearance)
       
-      mesh.position.set(offset.x, offset.y, offset.z)
-      rigidBody.setTranslation(offset)
+      mesh.position.set(position.x, position.y, position.z)
+      rigidBody.setTranslation(position)
 
-      // Set initial velocities
-      const linvel = {
-        x: Math.random() * 20 - 10,
-        y: 15,
-        z: Math.random() * 20 - 10
-      }
-      rigidBody.setLinvel(linvel)
+      // Set velocities from our configuration
+      rigidBody.setLinvel(velocity)
 
+      // Set angular velocity (rotation) - keeping random as specified
       const angvel = {
         x: Math.random() * 30 - 15,
         y: Math.random() * 30 - 15,
@@ -154,16 +151,14 @@ export const useDiceState = () => {
   
       const position = rigidBody.translation()
       if (position.y < -5) { 
-        rigidBody.setTranslation({ 
-          x: -8, 
-          y: 8 + Math.random() * 2,
-          z: (index - (dice.length-1)/2) * 2.5 
-        })
-        rigidBody.setLinvel({
-          x: Math.random() * 12 - 2,
-          y: 8,
-          z: Math.random() * 6 - 3
-        })
+        // For dice that fall out of the bowl, reset their position based on current throw config
+        const newPosition = diceRollerStore.getThrowPosition(index, dice.length)
+        const newVelocity = diceRollerStore.getThrowVelocity()
+        
+        rigidBody.setTranslation(newPosition)
+        rigidBody.setLinvel(newVelocity)
+        
+        // Keep random rotation
         rigidBody.setAngvel({
           x: Math.random() * 15 - 7.5,
           y: Math.random() * 15 - 7.5,
