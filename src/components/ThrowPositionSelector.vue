@@ -55,15 +55,15 @@ const drawSelector = () => {
   ctx.stroke()
   
   // Draw section labels
-  ctx.fillStyle = '#666'
+  ctx.fillStyle = '#999'
   ctx.font = '10px Arial'
   ctx.textAlign = 'center'
-  ctx.fillText('Winkel', width/6, 15)
-  ctx.fillText('Abstand', width/2, 15)
-  ctx.fillText('Stärke', width*5/6, 15)
+  ctx.fillText('Winkel', width/6, 18)
+  ctx.fillText('Abstand', width/2, 18)
+  ctx.fillText('Stärke', width*5/6, 18)
   
   // Draw angle control (compact semi-circle with arrow)
-  const angleRadius = height / 3
+  const angleRadius = height / 3.5
   
   // Draw semi-circle
   ctx.beginPath()
@@ -81,7 +81,7 @@ const drawSelector = () => {
   ctx.moveTo(angleControlX, centerY)
   ctx.lineTo(markerX, markerY)
   ctx.strokeStyle = '#42b983'
-  ctx.lineWidth = 2
+  ctx.lineWidth = 2.5
   ctx.stroke()
   
   // Draw marker
@@ -109,7 +109,7 @@ const drawSelector = () => {
   
   // Draw handle
   ctx.beginPath()
-  ctx.arc(radiusHandleX, radiusTrackY, 6, 0, Math.PI * 2)
+  ctx.arc(radiusHandleX, radiusTrackY, 5, 0, Math.PI * 2)
   ctx.fillStyle = '#42b983'
   ctx.fill()
   
@@ -136,9 +136,26 @@ const drawSelector = () => {
   
   // Draw handle
   ctx.beginPath()
-  ctx.arc(velocityHandleX, velocityTrackY, 6, 0, Math.PI * 2)
+  ctx.arc(velocityHandleX, velocityTrackY, 5, 0, Math.PI * 2)
   ctx.fillStyle = '#42b983'
   ctx.fill()
+  
+  // Display current values below the controls
+  ctx.fillStyle = '#999'
+  ctx.font = '10px Arial'
+  ctx.textAlign = 'center'
+  
+  // Format angle value to integer
+  const angleValue = Math.round(diceRollerStore.throwConfig.angle) + '°'
+  ctx.fillText(angleValue, width/6, height - 15)
+  
+  // Format radius value with 1 decimal place
+  const radiusValue = diceRollerStore.throwConfig.radius.toFixed(1)
+  ctx.fillText(radiusValue, width/2, height - 15)
+  
+  // Format velocity value with 1 decimal place
+  const velocityValue = diceRollerStore.throwConfig.velocityMagnitude.toFixed(1)
+  ctx.fillText(velocityValue, width*5/6, height - 15)
 }
 
 // Mouse event handlers
@@ -292,14 +309,15 @@ watch(
 .throw-position-selector {
   background: #1a1a1a;
   border-radius: 8px;
-  padding: 0.5rem;
+  padding: 1rem;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
 }
 
 .selector-canvas {
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 </style>

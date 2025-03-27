@@ -151,18 +151,15 @@ export const useDiceState = () => {
   
       const position = rigidBody.translation()
       if (position.y < -5) { 
-        // For dice that fall out of the bowl, reset their position based on current throw config
-        const newPosition = diceRollerStore.getThrowPosition(index, dice.length)
-        const newVelocity = diceRollerStore.getThrowVelocity()
-        
-        rigidBody.setTranslation(newPosition)
-        rigidBody.setLinvel(newVelocity)
-        
-        // Keep random rotation
-        rigidBody.setAngvel({
-          x: Math.random() * 15 - 7.5,
-          y: Math.random() * 15 - 7.5,
-          z: Math.random() * 15 - 7.5
+        rigidBody.setTranslation({ 
+          x: -8, 
+          y: 8 + Math.random() * 2,
+          z: (index - (dice.length-1)/2) * 2.5 
+        })
+        rigidBody.setLinvel({
+          x: Math.random() * 12 - 2,
+          y: 8,
+          z: Math.random() * 6 - 3
         })
       }
     })
