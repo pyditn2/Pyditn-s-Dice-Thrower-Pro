@@ -5,6 +5,7 @@ import DiceCheck from './components/DiceCheck.vue'
 import CharacterEditor from './components/CharacterEditor.vue'
 import CharacterSelector from "./components/CharacterSelector.vue"
 import FreeDiceRoller from './components/FreeDiceRoller.vue'
+import ManualDiceCheck from './components/ManualDiceCheck.vue'
 import OptionsMenu from './components/OptionsMenu.vue'
 import ThreeBackground from './components/ThreeBackground.vue'
 
@@ -31,6 +32,13 @@ const activeTab = ref('dice')
         Freies Würfeln
       </button>
       <button 
+        :class="{ active: activeTab === 'manual-dice' }"
+        class="tab-button"
+        @click="activeTab = 'manual-dice'"
+      >
+        Manuelle Eingabe
+      </button>
+      <button 
         :class="{ active: activeTab === 'character' }"
         class="tab-button"
         @click="activeTab = 'character'"
@@ -45,9 +53,13 @@ const activeTab = ref('dice')
       <CharacterSelector v-if="activeTab === 'dice'" />
       <DiceCheck v-if="activeTab === 'dice'" />
       
-      <!-- Free dice tab - Add CharacterSelector here too -->
+      <!-- Free dice tab -->
       <CharacterSelector v-if="activeTab === 'free-dice'" />
       <FreeDiceRoller v-if="activeTab === 'free-dice'" />
+      
+      <!-- Manual dice tab -->
+      <CharacterSelector v-if="activeTab === 'manual-dice'" />
+      <ManualDiceCheck v-if="activeTab === 'manual-dice'" />
       
       <CharacterEditor v-if="activeTab === 'character'" />
     </div>
