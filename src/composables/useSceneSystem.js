@@ -1,8 +1,12 @@
 import { ref, markRaw } from 'vue'
 import * as THREE from 'three'
 import RAPIER from '@dimforge/rapier3d-compat'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
+// Add this to the top-level variables
+const tableModel = ref(null)
 const diceWireframes = ref([])
+const skybox = ref(null)
 
 const GRAVITY = -25
 
@@ -35,6 +39,139 @@ export const useSceneSystem = () => {
     mainLight.shadow.radius = 1         // Slightly reduced from 1.5
     
     return mainLight
+  }
+
+  const setColorBackground = (color = 0x120024) => {
+    if (scene.value) {
+      // Deep purple color (can be changed to any hex color)
+      scene.value.background = new THREE.Color(color);
+      console.log('Set solid color background:', new THREE.Color(color));
+    }
+  }
+
+  const createStarryNightSky = () => {
+    console.log('Creating simple starry night sky');
+    
+    // Clean up existing skybox if present
+    if (skybox.value) {
+      if (skybox.value.parent) {
+        skybox.value.parent.remove(skybox.value);
+      }
+      cleanupSkybox();
+    }
+  
+    // Create a larger sphere for the sky (increased from 50 to 200)
+    const skyGeometry = new THREE.SphereGeometry(1900, 32, 32);
+    
+    // Create a simple texture-based starry sky
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;  // Increased resolution
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+    
+    // Fill with much darker gradient that borders on black
+    ctx.fillStyle = '#010102';  // Almost black with just a hint of blue/purple
+    ctx.fillRect(0, 0, 1024, 1024);
+    
+    // Add more dense, brighter stars
+    ctx.fillStyle = 'white';
+    
+    // Add small stars
+    for (let i = 0; i < 2000; i++) {
+      const x = Math.random() * 1024;
+      const y = Math.random() * 1024;
+      const size = 0.3 + Math.random() * 0.2; 
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 0.3);
+      ctx.fill();
+    }
+    
+    // Add a few brighter stars
+    for (let i = 0; i < 50; i++) {
+      const x = Math.random() * 1024;
+      const y = Math.random() * 1024;
+      const size = 0.5 + Math.random() * 0.3;
+      
+      // Create a glow effect
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, size * 2);
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(x, y, size * 2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Bright center
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.anisotropy = 16;  // Improves texture quality
+    
+    // Create material and mesh
+    const skyMaterial = new THREE.MeshBasicMaterial({
+      map: texture,
+      side: THREE.BackSide
+    });
+    
+    // Create the mesh
+    const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+    
+    // Position the sky at the origin
+    sky.position.set(0, 0, 0);
+    
+    // Make sure we're not being reactive
+    skybox.value = markRaw(sky);
+    scene.value.add(sky);
+    
+    console.log('Added darker, larger starry night sky to scene');
+    
+    return sky;
+  }
+  
+  // Function to update the sky animation during your animation loop
+  const updateSkyAnimation = (time) => {
+    if (skybox.value && 
+        skybox.value.material && 
+        skybox.value.material.uniforms && 
+        skybox.value.material.uniforms.time) {
+      
+      // Update the time uniform (using modulo to prevent precision issues)
+      skybox.value.material.uniforms.time.value = (time * 0.0001) % 1000;
+    }
+  }
+  
+  // Function to clean up skybox resources
+  const cleanupSkybox = () => {
+    if (skybox.value) {
+      // Clean up any associated resources
+      if (skybox.value.material) {
+        if (Array.isArray(skybox.value.material)) {
+          skybox.value.material.forEach(material => {
+            if (material.map) material.map.dispose();
+            material.dispose();
+          });
+        } else {
+          if (skybox.value.material.map) skybox.value.material.map.dispose();
+          skybox.value.material.dispose();
+        }
+      }
+      
+      if (skybox.value.geometry) {
+        skybox.value.geometry.dispose();
+      }
+      
+      if (skybox.value.parent) {
+        skybox.value.parent.remove(skybox.value);
+      }
+      
+      skybox.value = null;
+    }
   }
 
   const createFeltMaterial = () => {
@@ -274,21 +411,176 @@ export const useSceneSystem = () => {
     wireframeHelpers.value.push(wallHelper)
   }
 
+  const loadTableModel = async () => {
+    // If table is already loaded, just return it
+    if (tableModel.value) {
+      console.log('Table already loaded, reusing existing model')
+      return tableModel.value
+    }
+
+    return new Promise((resolve, reject) => {
+      const loader = new GLTFLoader()
+      
+      // Let's try multiple potential file paths
+      const potentialPaths = [
+        './src/assets/models/Table PDTP1.glb', // This is the actual path shown in the file structure
+        '/src/assets/models/Table PDTP1.glb',
+        'src/assets/models/Table PDTP1.glb',
+        './assets/models/Table PDTP1.glb',
+        '/assets/models/Table PDTP1.glb',
+        './Table PDTP1.glb',
+        '/Table PDTP1.glb',
+        'Table PDTP1.glb'
+      ]
+      
+      // Try loading from each path
+      function tryNextPath(pathIndex) {
+        if (pathIndex >= potentialPaths.length) {
+          // If we've tried all paths, reject with a clear error
+          reject(new Error('Could not find the table model at any of the attempted paths. Please check file location and name.'))
+          return
+        }
+        
+        const currentPath = potentialPaths[pathIndex]
+        console.log('Attempting to load table model from:', currentPath)
+        
+        loader.load(
+          currentPath,
+          // Called when the resource is loaded
+          (gltf) => {
+            const loadedTable = gltf.scene
+            
+            // Mark the model as raw to prevent Vue reactivity issues
+            markRaw(loadedTable)
+            
+            // Add user data for identification
+            loadedTable.userData.isTable = true
+            
+            // Position the table underneath the dice bowl
+            loadedTable.position.set(0, -35.8, 0)
+            
+            // Adjust the scale to make the table properly sized
+            loadedTable.scale.set(17, 17, 17)
+
+            loadedTable.rotation.y = -(Math.PI / 2)
+            
+            // Apply shadows
+            loadedTable.traverse((child) => {
+              if (child.isMesh) {
+                child.castShadow = true
+                child.receiveShadow = true
+                
+                // Ensure materials are properly configured for shadows
+                if (child.material) {
+                  child.material.shadowSide = THREE.FrontSide;
+                }
+              }
+            })
+            
+            // Add the model to the scene
+            scene.value.add(loadedTable)
+            
+            // Store in our reactive reference
+            tableModel.value = loadedTable
+            
+            // Log the loaded model for debugging
+            console.log('Table model loaded successfully')
+            
+            resolve(loadedTable)
+          },
+          // Called while loading is progressing
+          (xhr) => {
+            console.log((xhr.loaded / xhr.total * 100) + '% loaded')
+          },
+          // Called when loading has errors
+          (error) => {
+            console.error(`Error loading from ${potentialPaths[pathIndex]}:`, error)
+            // Try the next path
+            tryNextPath(pathIndex + 1)
+          }
+        )
+      }
+      
+      // Try the next path
+      tryNextPath(0)
+    })
+  }
+
   const initScene = async () => {
+    console.log('Scene initialization started');
+    
+    // If scene already exists, clean it up first
+    if (scene.value) {
+      console.log('Scene already exists, cleaning up before re-initialization');
+      
+      // Just clear children instead of full cleanup to avoid recursion
+      while (scene.value.children.length > 0) {
+        const child = scene.value.children[0];
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(m => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+        scene.value.remove(child);
+      }
+    }
+    
     // Mark the scene as raw to prevent Vue from making it reactive
-    scene.value = markRaw(new THREE.Scene())
+    scene.value = markRaw(new THREE.Scene());
+    console.log('New scene created');
+    
+    // Create the starry night sky
+    createStarryNightSky();
+    console.log('Starry night sky created');
     
     // Add lights (also marked raw)
-    scene.value.add(markRaw(setupMainLight()))
-    scene.value.add(markRaw(new THREE.AmbientLight(0x404040)))
-
-    world.value = markRaw(new RAPIER.World({ x: 0, y: GRAVITY, z: 0 }))
-    world.value.timestep = 1/120
-
-    createHexagonalGround()
+    console.log('Adding lights');
+    scene.value.add(markRaw(setupMainLight()));
+    scene.value.add(markRaw(new THREE.AmbientLight(0x404040)));
+    
+    // Add a subtle purple point light for ambiance
+    const purpleLight = new THREE.PointLight(0x9370DB, 0.5, 100);
+    purpleLight.position.set(0, 20, 0);
+    scene.value.add(markRaw(purpleLight));
+    console.log('Lights added');
+  
+    // Create physics world
+    console.log('Setting up physics world');
+    world.value = markRaw(new RAPIER.World({ x: 0, y: GRAVITY, z: 0 }));
+    world.value.timestep = 1/120;
+  
+    // Create ground
+    console.log('Creating hexagonal ground');
+    createHexagonalGround();
+    
+    // Load the table model
+    console.log('Loading table model');
+    try {
+      await loadTableModel();
+      console.log('Table model loaded and added to scene');
+    } catch (error) {
+      console.error('Failed to load table model:', error);
+    }
+    
+    // Log the final scene content
+    console.log('Final scene children count:', scene.value.children.length);
+    
+    console.log('Scene initialization completed');
   }
 
   const cleanupScene = () => {
+    // Check if scene exists before proceeding
+    if (!scene.value) {
+      console.warn('Attempted to clean up scene before it was initialized');
+      return;
+    }
+    
+    // Clean up the skybox
+    cleanupSkybox();
+    
     // Dispose of dice wireframes
     diceWireframes.value.forEach(wireframe => {
       if (wireframe.geometry) wireframe.geometry.dispose();
@@ -296,6 +588,11 @@ export const useSceneSystem = () => {
       if (wireframe.parent) wireframe.parent.remove(wireframe);
     });
     diceWireframes.value = [];
+  
+    // Temporarily remove table from scene without disposing it
+    if (tableModel.value && tableModel.value.parent === scene.value) {
+      scene.value.remove(tableModel.value);
+    }
   
     // Properly dispose of all scene objects
     scene.value.traverse((object) => {
@@ -315,6 +612,11 @@ export const useSceneSystem = () => {
           }
         }
       }
+      
+      // Don't remove table - we're preserving it
+      if (object.userData && object.userData.isTable && object !== tableModel.value) {
+        scene.value.remove(object);
+      }
     });
   
     // Clear scene
@@ -325,8 +627,17 @@ export const useSceneSystem = () => {
     // Recreate basic scene elements
     scene.value.add(setupMainLight());
     scene.value.add(new THREE.AmbientLight(0x404040));
+    
+    // Re-create the starry night sky
+    createStarryNightSky();
+    
     createHexagonalGround();
-  };
+    
+    // Re-add the table if it exists
+    if (tableModel.value) {
+      scene.value.add(tableModel.value);
+    }
+  }
   
   const toggleWireframes = (diceManagerInstance) => {
     showWireframes.value = !showWireframes.value
@@ -342,6 +653,7 @@ export const useSceneSystem = () => {
     }
   }
 
+  // Return the necessary methods
   return {
     scene,
     world,
@@ -349,6 +661,11 @@ export const useSceneSystem = () => {
     initScene,
     cleanupScene,
     toggleWireframes,
-    addDiceWireframe
+    addDiceWireframe,
+    loadTableModel,
+    createStarryNightSky,
+    cleanupSkybox,
+    updateSkyAnimation,
+    setColorBackground 
   }
 }

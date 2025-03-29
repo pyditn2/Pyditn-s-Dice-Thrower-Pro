@@ -21,7 +21,7 @@ export class CameraManager {
   ensureCameraCount(count) {
     // Add new cameras if needed
     while (this.cameras.length < count) {
-      const camera = new THREE.PerspectiveCamera(45, this.containerWidth / this.containerHeight, 0.1, 1000)
+      const camera = new THREE.PerspectiveCamera(45, this.containerWidth / this.containerHeight, 0.1, 2000)
       this.cameras.push(camera)
       this.cameraStates.push({
         mode: 'overview',
@@ -128,7 +128,7 @@ export class CameraManager {
   }
 
   updateRotatingCamera(camera, index, rotationAngle, deltaTime) {
-    const radius = 8
+    const radius = 18
     
     this.individualRotationAngles[index] += this.rotationSpeeds[index] * deltaTime
     const totalAngle = rotationAngle + this.individualRotationAngles[index]
@@ -136,7 +136,7 @@ export class CameraManager {
     const diePosition = this.lastDiePositions[index] || new THREE.Vector3(0, 0, 0)
     const newPosition = new THREE.Vector3(
       diePosition.x + Math.cos(totalAngle) * radius,
-      diePosition.y + 5,
+      diePosition.y + 10,
       diePosition.z + Math.sin(totalAngle) * radius
     )
     
