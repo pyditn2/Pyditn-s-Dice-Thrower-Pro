@@ -40,7 +40,7 @@ export class DiceManager {
     // Return dice to pool if pool isn't full
     if (this.dicePool[type].length < this.poolSize) {
       // Reset dice to initial state if necessary
-      dice.resetState?.() // Optional method to reset dice state
+      dice.resetState?.() // Optional method to reset dice state, probably not needed
       this.dicePool[type].push(dice)
     }
   }
@@ -84,7 +84,7 @@ export class DiceManager {
     const diceInfo = this.activeDice.get(dice.uuid)
     if (diceInfo) {
       diceInfo.creator.cleanup(diceInfo.world, diceInfo.rigidBody)
-      // Return the dice instance to the pool
+      // Return the dice instance to the pool, using the type, dont forget
       this.returnDiceToPool(diceInfo.creator, diceInfo.type)
       this.activeDice.delete(dice.uuid)
     }
@@ -99,7 +99,6 @@ export class DiceManager {
     this.activeDice.clear()
   }
 
-  // Rest of your existing methods remain the same
   updateDiceAppearance(dice, appearance) {
     const diceInfo = this.activeDice.get(dice.uuid)
     if (diceInfo && diceInfo.creator) {
