@@ -106,8 +106,8 @@ createFaceLabel(number, center, normal) {
   createBaseMesh(geometry) {
     const material = new THREE.MeshPhongMaterial({
       color: new THREE.Color(this.appearance.color),
-      opacity: this.appearance.opacity,
-      transparent: this.appearance.opacity < 1,
+      opacity: 1,
+      transparent: 0,
       shininess: this.appearance.shininess,
       shadowSide: THREE.BackSide
     })

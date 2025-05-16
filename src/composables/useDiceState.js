@@ -28,7 +28,7 @@ export const useDiceState = () => {
         if (renderer.domElement && renderer.domElement.parentNode) {
           renderer.domElement.parentNode.removeChild(renderer.domElement);
         }
-        renderer.dispose();  // Dispose of the renderer
+        renderer.dispose();
         if (renderer.forceContextLoss) {
           renderer.forceContextLoss();
         }
@@ -44,7 +44,7 @@ export const useDiceState = () => {
       const renderer = new THREE.WebGLRenderer({ 
         antialias: !isLinux,
         powerPreference: 'default',
-        failIfMajorPerformanceCaveat: false, // Critical change: don't fail on low performance
+        failIfMajorPerformanceCaveat: false, // ToDo: Look at this again, this is not the right fix
         alpha: true
       });
       

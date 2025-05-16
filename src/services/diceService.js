@@ -1,11 +1,14 @@
 export class DiceService {
     static calculateQS(remainingPoints) {
-        if (remainingPoints >= 16) return 6
-        if (remainingPoints >= 13) return 5
-        if (remainingPoints >= 10) return 4
-        if (remainingPoints >= 7) return 3
-        if (remainingPoints >= 4) return 2
-        return 1
+        // For every 3 remaining points above 16, add another QS level
+        if (remainingPoints >= 16) {
+            return 6 + Math.floor((remainingPoints - 16) / 3);
+        }
+        if (remainingPoints >= 13) return 5;
+        if (remainingPoints >= 10) return 4;
+        if (remainingPoints >= 7) return 3;
+        if (remainingPoints >= 4) return 2;
+        return 1;
     }
 
     static async performAttributeCheck(attributeName, modification = 0, diceComponent) {

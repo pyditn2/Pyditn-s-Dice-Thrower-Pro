@@ -421,89 +421,97 @@ export const useSceneSystem = () => {
     return new Promise((resolve, reject) => {
       const loader = new GLTFLoader()
       
-      // Let's try multiple potential file paths
-      const potentialPaths = [
-        './src/assets/models/Table PDTP1.glb', // This is the actual path shown in the file structure
-        '/src/assets/models/Table PDTP1.glb',
-        'src/assets/models/Table PDTP1.glb',
-        './assets/models/Table PDTP1.glb',
-        '/assets/models/Table PDTP1.glb',
-        './Table PDTP1.glb',
-        '/Table PDTP1.glb',
-        'Table PDTP1.glb'
-      ]
+      // Simplify paths based on the warning
+      const potentialPaths = import.meta.env.DEV 
+        ? [
+            '/TablePDTP1.glb',               // Root path (from public dir)
+            './TablePDTP1.glb'
+          ]
+        : [
+            '/TablePDTP1.glb',               // Root path in production
+            './TablePDTP1.glb'               // Fallback
+          ];
       
-      // Try loading from each path
-      function tryNextPath(pathIndex) {
-        if (pathIndex >= potentialPaths.length) {
-          // If we've tried all paths, reject with a clear error
-          reject(new Error('Could not find the table model at any of the attempted paths. Please check file location and name.'))
-          return
+      console.log('Will try loading table model from these paths:', potentialPaths);
+      
+      let currentPathIndex = 0;
+      
+      // Function to attempt loading from the next path
+      const tryNextPath = () => {
+        if (currentPathIndex >= potentialPaths.length) {
+          console.error('Failed to load table model from any path');
+          reject(new Error('Could not load table model from any path'));
+          return;
         }
         
-        const currentPath = potentialPaths[pathIndex]
-        console.log('Attempting to load table model from:', currentPath)
+        const currentPath = potentialPaths[currentPathIndex];
+        console.log(`Attempting to load table model from: ${currentPath}`);
         
         loader.load(
           currentPath,
-          // Called when the resource is loaded
+          // Success callback
           (gltf) => {
-            const loadedTable = gltf.scene
+            console.log(`Successfully loaded table from: ${currentPath}`);
+            const loadedTable = gltf.scene;
             
             // Mark the model as raw to prevent Vue reactivity issues
-            markRaw(loadedTable)
+            markRaw(loadedTable);
             
             // Add user data for identification
-            loadedTable.userData.isTable = true
+            loadedTable.userData.isTable = true;
             
             // Position the table underneath the dice bowl
-            loadedTable.position.set(0, -35.8, 0)
+            loadedTable.position.set(0, -35.8, 0);
             
             // Adjust the scale to make the table properly sized
-            loadedTable.scale.set(17, 17, 17)
-
-            loadedTable.rotation.y = -(Math.PI / 2)
+            loadedTable.scale.set(17, 17, 17);
+            loadedTable.rotation.y = -(Math.PI / 2);
             
             // Apply shadows
             loadedTable.traverse((child) => {
               if (child.isMesh) {
-                child.castShadow = true
-                child.receiveShadow = true
+                child.castShadow = true;
+                child.receiveShadow = true;
                 
                 // Ensure materials are properly configured for shadows
                 if (child.material) {
                   child.material.shadowSide = THREE.FrontSide;
                 }
               }
-            })
+            });
             
             // Add the model to the scene
-            scene.value.add(loadedTable)
+            scene.value.add(loadedTable);
             
             // Store in our reactive reference
-            tableModel.value = loadedTable
+            tableModel.value = loadedTable;
             
-            // Log the loaded model for debugging
-            console.log('Table model loaded successfully')
+            // Log success for debugging
+            console.log('Table model loaded and added to scene successfully');
             
-            resolve(loadedTable)
+            resolve(loadedTable);
           },
-          // Called while loading is progressing
+          // Progress callback
           (xhr) => {
-            console.log((xhr.loaded / xhr.total * 100) + '% loaded')
+            if (xhr.lengthComputable) {
+              console.log(`${currentPath}: ${(xhr.loaded / xhr.total * 100).toFixed(2)}% loaded`);
+            } else {
+              console.log(`${currentPath}: ${xhr.loaded} bytes loaded`);
+            }
           },
-          // Called when loading has errors
+          // Error callback
           (error) => {
-            console.error(`Error loading from ${potentialPaths[pathIndex]}:`, error)
-            // Try the next path
-            tryNextPath(pathIndex + 1)
+            console.warn(`Failed to load from ${currentPath}:`, error);
+            // Try next path
+            currentPathIndex++;
+            tryNextPath();
           }
-        )
-      }
+        );
+      };
       
-      // Try the next path
-      tryNextPath(0)
-    })
+      // Start trying paths
+      tryNextPath();
+    });
   }
 
   const initScene = async () => {

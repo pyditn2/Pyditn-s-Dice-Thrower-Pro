@@ -69,7 +69,7 @@ export class CameraManager {
         settleTime: null
       }
     }
-
+    //ToDo: handle camera state differently, this is too brittle
     const state = this.cameraStates[index]
     
     if (this.hasCompletedTopdown.has(index) && mode === 'topdown') {
