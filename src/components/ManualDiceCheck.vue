@@ -58,6 +58,7 @@ const talentValue = computed(() => {
 const updateTalent = (newValue) => {
   selectedTalent.value = newValue
   result.value = null
+  diceValues.value = [0, 0, 0]
 }
 
 const calculateResult = () => {
@@ -65,7 +66,7 @@ const calculateResult = () => {
     return
   }
 
-  const rolls = [...diceValues.value]
+  const rolls = [...diceValues.value].slice(0, 3)
   
   // Check if the dice values are within the valid range
   if (rolls.some(roll => roll < 1 || roll > 20)) {
@@ -81,7 +82,7 @@ const calculateResult = () => {
 
   // Calculate difficulty for talent check
   let pointsNeeded = 0
-  const adjustedAttributes = talentAttributes.value.map((attr, index) => {
+  const adjustedAttributes = talentAttributes.value.slice(0, 3).map((attr, index) => {
     const roll = rolls[index]
     const difference = roll - attr.adjustedValue
     
