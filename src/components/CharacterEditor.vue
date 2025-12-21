@@ -65,9 +65,6 @@ const deleteCurrentCharacter = () => {
 }
 </script>
 
-Here's the complete template section for CharacterEditor.vue that you can directly copy and paste:
-
-```vue
 <template>
   <div class="character-editor">
     <div v-if="characterStore.activeCharacter" class="editor-layout">
