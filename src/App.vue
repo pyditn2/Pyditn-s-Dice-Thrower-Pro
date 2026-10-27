@@ -1,197 +1,129 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
-import { invoke } from "@tauri-apps/api/core"
-import DiceCheck from './components/DiceCheck.vue'
-import CharacterEditor from './components/CharacterEditor.vue'
-import CharacterSelector from "./components/CharacterSelector.vue"
-import FreeDiceRoller from './components/FreeDiceRoller.vue'
-import ManualDiceCheck from './components/ManualDiceCheck.vue'
-import OptionsMenu from './components/OptionsMenu.vue'
-import ThreeBackground from './components/ThreeBackground.vue'
 
-const activeTab = ref('dice')
+import AnimatedBackground from '@/background/AnimatedBackground.vue'
+import CharacterBar from '@/components/CharacterBar.vue'
+import OptionsMenu from '@/components/OptionsMenu.vue'
+import { startDiceEngine } from '@/composables/useDiceEngine'
+import { TABS } from '@/router'
+import { getInitialState } from '@/stores/persisted'
+
+startDiceEngine()
+
+const importReport = ref(getInitialState().importReport)
+
+function importMessage(): string {
+  const report = importReport.value!
+  const parts: string[] = []
+  if (report.characterCount > 0) {
+    parts.push(report.characterCount === 1 ? '1 Charakter' : `${report.characterCount} Charaktere`)
+  }
+  if (report.settingsImported) parts.push('Ihre Einstellungen')
+  let message = `Aus der alten Version übernommen: ${parts.join(' und ')}.`
+  if (report.unknownTalents.length > 0) {
+    message += ` Nicht übernommen (unbekannte Talente): ${report.unknownTalents.join(', ')}.`
+  }
+  return message
+}
 </script>
 
 <template>
-  <ThreeBackground />
+  <AnimatedBackground />
+  <OptionsMenu />
+
   <div class="app">
-    <!-- Tab Navigation -->
-    <div class="tab-navigation">
-      <button 
-        :class="{ active: activeTab === 'dice' }"
-        class="tab-button"
-        @click="activeTab = 'dice'"
-      >
-        Würfelproben
-      </button>
-      <button 
-        :class="{ active: activeTab === 'free-dice' }"
-        class="tab-button"
-        @click="activeTab = 'free-dice'"
-      >
-        Freies Würfeln
-      </button>
-      <button 
-        :class="{ active: activeTab === 'manual-dice' }"
-        class="tab-button"
-        @click="activeTab = 'manual-dice'"
-      >
-        Manuelle Eingabe
-      </button>
-      <button 
-        :class="{ active: activeTab === 'character' }"
-        class="tab-button"
-        @click="activeTab = 'character'"
-      >
-        Charakterwerte
-      </button>
+    <nav class="tabs" aria-label="Bereiche">
+      <RouterLink v-for="tab in TABS" :key="tab.path" :to="tab.path" class="tab">
+        {{ tab.title }}
+      </RouterLink>
+    </nav>
+
+    <div v-if="importReport" class="notice" role="status">
+      <span>{{ importMessage() }}</span>
+      <button aria-label="Hinweis schließen" @click="importReport = null">×</button>
     </div>
 
-    <!-- Tab Content -->
-    <div class="tab-content">
-      <!-- Dice tab -->
-      <CharacterSelector v-if="activeTab === 'dice'" />
-      <DiceCheck v-if="activeTab === 'dice'" />
-      
-      <!-- Free dice tab -->
-      <CharacterSelector v-if="activeTab === 'free-dice'" />
-      <FreeDiceRoller v-if="activeTab === 'free-dice'" />
-      
-      <!-- Manual dice tab -->
-      <CharacterSelector v-if="activeTab === 'manual-dice'" />
-      <ManualDiceCheck v-if="activeTab === 'manual-dice'" />
-      
-      <CharacterEditor v-if="activeTab === 'character'" />
-    </div>
+    <main class="content panel">
+      <CharacterBar />
+      <RouterView />
+    </main>
   </div>
-  <OptionsMenu />
 </template>
 
-<style>
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  background-color: transparent;
-  color: #ffffff;
-}
-
+<style scoped>
 .app {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
-  height: 100vh;
-  background-color: transparent;
+  padding: 1rem 1rem 2rem;
   text-align: center;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
 }
 
-.tab-content {
-  padding: 1rem;
-  color: #ffffff;
-  background-color: rgba(0, 0, 0, 0.5);
-  border-radius: 8px;
-  min-width: min-content;
-}
-
-.tab-navigation {
+.tabs {
   display: flex;
-  gap: 1rem;
-  border-bottom: 1px solid #333;
-  padding-bottom: 0.5rem;
+  flex-wrap: wrap;
   justify-content: center;
+  gap: 0.5rem 1rem;
+  padding: 0 3.5rem 0.5rem;
   margin-bottom: 1rem;
-  flex-shrink: 0;
+  border-bottom: 1px solid #333;
 }
 
-.tab-button {
+.tab {
   padding: 0.5rem 1rem;
-  background-color: rgba(51, 51, 51, 0.8); 
-  color: #ffffff;
+  border-radius: var(--radius);
+  background: rgba(51, 51, 51, 0.8);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 1.05rem;
+  border-bottom: 2px solid transparent;
+}
+
+.tab:hover {
+  background: rgba(68, 68, 68, 0.8);
+}
+
+.tab.router-link-exact-active {
+  background: #000;
+  border-bottom-color: var(--accent);
+  font-weight: bold;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 48rem;
+  margin: 0 auto 1rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: rgba(66, 185, 131, 0.12);
+  text-align: left;
+}
+
+.notice button {
+  background: none;
   border: none;
-  cursor: pointer;
-  font-size: 1.1rem;
-  border-radius: 4px;
+  font-size: 1.3rem;
+  line-height: 1;
 }
 
-.tab-button:hover {
-  background-color: rgba(68, 68, 68, 0.8); 
+.content {
+  min-height: 60vh;
 }
 
-.tab-button.active {
-  background-color: rgba(0, 0, 0, 0.8); 
-  border-bottom: 2px solid #42b983;
-  font-weight: bold;
-}
-
-button, input, select {
-  background-color: rgba(51, 51, 51, 0.8); 
-  color: #ffffff;
-  border: 1px solid #444444;
-  border-radius: 4px;
-  padding: 0.5rem;
-}
-
-button:hover {
-  background-color: rgba(68, 68, 68, 0.8); 
-}
-
-.tab-button.active {
-  background-color: #000000;
-  border-bottom: 2px solid #42b983;
-  font-weight: bold;
-}
-
-.tab-content {
-  padding: 1rem;
-  color: #ffffff;
-}
-
-button, input, select {
-  background-color: #333333;
-  color: #ffffff;
-  border: 1px solid #444444;
-  border-radius: 4px;
-  padding: 0.5rem;
-}
-
-button:hover {
-  background-color: #444444;
-}
-
-h1, h2, h3, h4, label, .talent-name, .selected-item, .weapon-header {
-  user-select: none;
-}
-
-
-h2 {
-  color: #42b983;
-  margin-bottom: 2rem;
-  font-size: 1.75rem;
-  margin-top: 0 !important;
-  text-shadow: 0 0 8px #42b983;
-}
-
-
-h3 {
-  color: #42b983;
-  margin-bottom: 1rem;
-  font-size: 1.35rem;
-  margin-top: 0 !important;
-  text-shadow: 0 0 4px #42b983;
-}
-
-h4 {
-  color: #999;
-  font-size: 1.1rem;
-  margin: 1rem 0;
-}
-
-
-option {
-  background-color: #333333;
-  color: #ffffff;
+@media (max-width: 640px) {
+  .app {
+    padding: 0.5rem 0.5rem 1.5rem;
+  }
+  .tabs {
+    padding: 0 3rem 0.5rem 0;
+    justify-content: flex-start;
+  }
+  .tab {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.95rem;
+  }
 }
 </style>

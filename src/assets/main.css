@@ -1,0 +1,163 @@
+:root {
+  color-scheme: dark;
+  --bg: #000;
+  --bg-animated: #1a1a1a;
+  --panel: rgba(0, 0, 0, 0.55);
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-strong: #1a1a1a;
+  --control: #333;
+  --control-hover: #444;
+  --border: #444;
+  --text: #fff;
+  --muted: #999;
+  --accent: #42b983;
+  --accent-hover: #3aa876;
+  --danger: #ff6b6b;
+  --danger-strong: #c0392b;
+  --success-bg: #1a472a;
+  --failure-bg: #4a1a1a;
+  --gold: #ffd700;
+  --radius: 6px;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  line-height: 1.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Only the root gets a background: a body background would paint over the fixed z-index -1
+   background layer (AnimatedBackground). */
+html {
+  background: var(--bg);
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  color: var(--text);
+}
+
+h1,
+h2,
+h3 {
+  color: var(--accent);
+  margin: 0 0 1rem;
+}
+
+h2 {
+  font-size: 1.6rem;
+  text-shadow: 0 0 8px var(--accent);
+}
+
+h3 {
+  font-size: 1.25rem;
+  text-shadow: 0 0 4px var(--accent);
+}
+
+h4 {
+  color: var(--muted);
+  font-size: 1.05rem;
+  margin: 1rem 0 0.5rem;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--control);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+button {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+button:hover:not(:disabled) {
+  background: var(--control-hover);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+button.danger {
+  background: var(--danger-strong);
+  border-color: var(--danger-strong);
+}
+
+input[type='number'] {
+  width: 5rem;
+  text-align: center;
+}
+
+input[type='color'] {
+  padding: 0;
+  width: 2.5rem;
+  height: 2rem;
+  cursor: pointer;
+}
+
+label,
+h1,
+h2,
+h3,
+h4 {
+  user-select: none;
+}
+
+.panel {
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.field > label {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

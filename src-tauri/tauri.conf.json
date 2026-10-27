@@ -1,20 +1,24 @@
 {
-  "$schema": "https://schema.tauri.app/config/2",
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "PDTP",
-  "version": "0.1.27",
+  "version": "2.0.0",
   "identifier": "com.pdtp.app",
   "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1430",
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist"
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
       {
         "title": "PDTP",
-        "width": 800,
-        "height": 600
+        "width": 1100,
+        "height": 820,
+        "minWidth": 420,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
       }
     ],
     "security": {
@@ -30,9 +34,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "resources": [
-      "../public/TablePDTP1.glb"
     ]
   }
 }

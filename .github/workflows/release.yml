@@ -1,0 +1,156 @@
+name: release
+
+# Every push to main publishes a release: the desktop apps for macOS, Linux and Windows plus a zip of
+# the web build. The patch version is bumped automatically, except for the first release of a version
+# that has no tag yet (e.g. right after setting 2.0.0 by hand).
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Decide version
+        id: version
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          if git rev-parse "v$CURRENT" >/dev/null 2>&1; then
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            echo "version=$MAJOR.$MINOR.$((PATCH + 1))" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version files
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$CURRENT" = "$VERSION" ]; then exit 0; fi
+          npm version "$VERSION" --no-git-tag-version
+          node -e '
+            const fs = require("fs")
+            const f = "src-tauri/tauri.conf.json"
+            const c = JSON.parse(fs.readFileSync(f, "utf8"))
+            c.version = process.env.VERSION
+            fs.writeFileSync(f, JSON.stringify(c, null, 2) + "\n")
+          '
+          sed -i "0,/^version = \".*\"/s//version = \"$VERSION\"/" src-tauri/Cargo.toml
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+          git commit -m "Bump version to $VERSION"
+          git push
+
+  desktop:
+    needs: version
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: windows-latest
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - run: npm ci
+
+      - name: Changelog
+        id: changelog
+        shell: bash
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          RANGE=${LATEST_TAG:+$LATEST_TAG..HEAD}
+          {
+            echo "changes<<CHANGELOG_EOF"
+            git log $RANGE --pretty=format:"* %s (%h)" --reverse
+            echo
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v${{ needs.version.outputs.version }}
+          releaseName: PDTP v${{ needs.version.outputs.version }}
+          releaseBody: |
+            PDTP v${{ needs.version.outputs.version }}
+
+            Changes in this release:
+            ${{ steps.changelog.outputs.changes }}
+
+            Download the installer for your system below. `PDTP-web.zip` contains the browser version
+            for uploading to any web host.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  web:
+    needs: [version, desktop]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build-only
+      - run: cd dist && zip -r ../PDTP-web.zip .
+
+      - name: Attach web build to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "v${{ needs.version.outputs.version }}" PDTP-web.zip --clobber
